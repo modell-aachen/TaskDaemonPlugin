@@ -62,7 +62,6 @@ sub _send {
 
 sub launchWorker {
     my $session = shift;
-    my %indexers;
     my $exitWorker = AnyEvent->condvar;
     AE::signal INT => sub { $exitWorker->send; };
 
@@ -73,7 +72,7 @@ sub launchWorker {
         $Foswiki::cfg{DefaultUrlHost} = $json->{host} if $json->{host};
 
         if ($json->{type} eq 'update_topic') {
-            my $indexer = $indexers{$Foswiki::cfg{DefaultUrlHost}} || Foswiki::Plugins::SolrPlugin::Index->new($session);
+            my $indexer = Foswiki::Plugins::SolrPlugin::getIndexer($session);
 
             my ($web, $topic) = Foswiki::Func::normalizeWebTopicName(undef, $json->{data});
             eval { $indexer->updateTopic($web, $topic); $indexer->commit(1); };
@@ -81,13 +80,17 @@ sub launchWorker {
                 Foswiki::Func::writeWarning( "Worker: update_topic exception: $@" );
             }
         } elsif ($json->{type} eq 'update_web') {
-            my $indexer = $indexers{$Foswiki::cfg {DefaultUrlHost}} || Foswiki::Plugins::SolrPlugin::Index->new($session);
+            my $indexer = Foswiki::Plugins::SolrPlugin::getIndexer($session);
 
             my ($web, $topic) = Foswiki::Func::normalizeWebTopicName($json->{data});
             eval { $indexer->update($web); $indexer->commit(1); };
             if ($@) {
                 Foswiki::Func::writeWarning( "Worker: update_web exception: $@" );
             }
+        } elsif ($json->{type} eq 'flush_acls') {
+            Foswiki::Func::wrtieWarning("flushing acls") if DEBUG;
+            my $indexer = Foswiki::Plugins::SolrPlugin::getIndexer($session);
+            $indexer->finish();
         } elsif ($json->{type} eq 'exit_worker') {
             $exitWorker->send;
             return;
@@ -121,7 +124,12 @@ sub launchWorker {
 sub afterSaveHandler {
     my ( $text, $topic, $web, $error, $meta ) = @_;
 
-    _send("$web.$topic");
+    if($topic eq $Foswiki::cfg{WebPrefsTopicName}) {
+        _send($web, 'flush_acls'); # XXX check if ACLs/workflow changed
+        _send($web, 'update_web');
+    } else {
+        _send("$web.$topic");
+    }
 }
 
 sub afterRenameHandler {

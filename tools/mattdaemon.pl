@@ -40,7 +40,7 @@ sub run {
                             });
                             return;
                         }
-                        if ($json->{type} eq 'update_topic' || $json->{type} eq 'update_web') {
+                        if ($json->{type} eq 'update_topic' || $json->{type} eq 'update_web' || $json->{type} eq 'flush_acls') {
                             print "$json->{type}: $json->{data}\n" if DEBUG;
                             if (keys %waiting_workers) {
                                 my ($worker) = keys %waiting_workers;
