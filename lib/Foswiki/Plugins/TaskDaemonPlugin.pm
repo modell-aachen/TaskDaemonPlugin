@@ -21,6 +21,8 @@ our $SHORTDESCRIPTION = 'Simple example on how to get around IWatch.';
 
 our $NO_PREFS_IN_TOPIC = 1;
 
+use constant DEBUG => 0;
+
 sub initPlugin {
     my ( $topic, $web, $user, $installWeb ) = @_;
 
@@ -45,7 +47,7 @@ sub _send {
         Timeout => 3
     );
 
-    Foswiki::Func::writeWarning("sending $message");
+    Foswiki::Func::writeWarning("sending $message") if DEBUG;
     if ($socket) {
         $socket->send(encode_json({
             type => 'update_topic',

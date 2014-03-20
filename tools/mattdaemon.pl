@@ -7,6 +7,8 @@ use AnyEvent::Handle;
 use AnyEvent::Socket;
 
 my $dir = '/srv/www/1.1.8/open';
+
+use constant DEBUG => 1;
 my @todos = ();
 
 sub run {
@@ -39,7 +41,7 @@ sub run {
                             return;
                         }
                         if ($json->{type} eq 'update_topic') {
-                            print "update topic: $json->{topic}\n";
+                            print "update topic: $json->{topic}\n" if DEBUG;
                             if (keys %waiting_workers) {
                                 my ($worker) = keys %waiting_workers;
                                 my $whdl = delete $waiting_workers{$worker};
