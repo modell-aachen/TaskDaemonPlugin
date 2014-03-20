@@ -38,7 +38,9 @@ sub initPlugin {
 }
 
 sub _send {
-    my ($message) = @_;
+    my ($message, $type) = @_;
+
+    $type ||= 'update_topic';
 
     my $socket = new IO::Socket::INET->new(
         PeerAddr => 'localhost',
@@ -47,11 +49,11 @@ sub _send {
         Timeout => 3
     );
 
-    Foswiki::Func::writeWarning("sending $message") if DEBUG;
+    Foswiki::Func::writeWarning("sending '$type': '$message'") if DEBUG;
     if ($socket) {
         $socket->send(encode_json({
-            type => 'update_topic',
-            topic => $message,
+            type => $type,
+            data => $message,
         }));
     } else {
         Foswiki::Func::writeWarning( "Realtime-indexing is offline!" );
@@ -67,19 +69,31 @@ sub launchWorker {
     my @read; @read = (json => sub {
         my ($hdl, $json) = @_;
 
-        if ($json->{type} eq 'update_topic') {
-            my $host = $json->{host} || $Foswiki::cfg{DefaultUrlHost};
-            my $indexer = $indexers{$host} || Foswiki::Plugins::SolrPlugin::Index->new($session);
+        my $oldHost = $Foswiki::cfg{DefaultUrlHost};
+        $Foswiki::cfg{DefaultUrlHost} = $json->{host} if $json->{host};
 
-            my ($web, $topic) = Foswiki::Func::normalizeWebTopicName(undef, $json->{topic});
+        if ($json->{type} eq 'update_topic') {
+            my $indexer = $indexers{$Foswiki::cfg{DefaultUrlHost}} || Foswiki::Plugins::SolrPlugin::Index->new($session);
+
+            my ($web, $topic) = Foswiki::Func::normalizeWebTopicName(undef, $json->{data});
             eval { $indexer->updateTopic($web, $topic); $indexer->commit(1); };
             if ($@) {
                 Foswiki::Func::writeWarning( "Worker: update_topic exception: $@" );
+            }
+        } elsif ($json->{type} eq 'update_web') {
+            my $indexer = $indexers{$Foswiki::cfg {DefaultUrlHost}} || Foswiki::Plugins::SolrPlugin::Index->new($session);
+
+            my ($web, $topic) = Foswiki::Func::normalizeWebTopicName($json->{data});
+            eval { $indexer->update($web); $indexer->commit(1); };
+            if ($@) {
+                Foswiki::Func::writeWarning( "Worker: update_web exception: $@" );
             }
         } elsif ($json->{type} eq 'exit_worker') {
             $exitWorker->send;
             return;
         }
+
+        $Foswiki::cfg{DefaultUrlHost} = $oldHost;
 
         $hdl->push_write(json => {type => 'worker_idle'});
         $hdl->push_read(@read);
@@ -114,8 +128,8 @@ sub afterRenameHandler {
     my ( $oldWeb, $oldTopic, $oldAttachment,
          $newWeb, $newTopic, $newAttachment ) = @_;
 
-     if(not $oldWeb) {
-         _send("$oldWeb\n$newWeb");
+     if(not $oldTopic) {
+         _send("$newWeb", 'update_web'); # old web will be deleted automatically
      } else {
          if ("$oldWeb.$oldTopic" eq "$newWeb.$newTopic") {
              # --> probably attachent

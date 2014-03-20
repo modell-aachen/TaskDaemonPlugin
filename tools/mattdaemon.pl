@@ -40,8 +40,8 @@ sub run {
                             });
                             return;
                         }
-                        if ($json->{type} eq 'update_topic') {
-                            print "update topic: $json->{topic}\n" if DEBUG;
+                        if ($json->{type} eq 'update_topic' || $json->{type} eq 'update_web') {
+                            print "$json->{type}: $json->{data}\n" if DEBUG;
                             if (keys %waiting_workers) {
                                 my ($worker) = keys %waiting_workers;
                                 my $whdl = delete $waiting_workers{$worker};
