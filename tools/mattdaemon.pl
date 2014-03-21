@@ -47,17 +47,7 @@ sub run {
                             });
                             return;
                         }
-                        if ($json->{type} eq 'update_topic' || $json->{type} eq 'update_web' || $json->{type} eq 'flush_acls') {
-                            print "$json->{type}: $json->{data}\n" if DEBUG;
-                            if (keys %waiting_workers) {
-                                my ($worker) = keys %waiting_workers;
-                                my $whdl = delete $waiting_workers{$worker};
-                                $whdl->push_write(json => $json);
-                            } else {
-                                push @queue, $json;
-                            }
-                            $hdl->push_write(json => {status => 'ok', msg => 'queued'});
-                        } elsif ($json->{type} eq 'worker_idle') {
+                        if ($json->{type} eq 'worker_idle') {
                             if (@queue) {
                                 $hdl->push_write(json => shift @queue);
                             } else {
@@ -68,6 +58,16 @@ sub run {
                                 $waiting_workers{$_}->push_write(json => {type => 'exit_worker'});
                                 $disconnect->($_);
                             }
+                        } else {
+                            print "$json->{type}: $json->{data}\n" if DEBUG;
+                            if (keys %waiting_workers) {
+                                my ($worker) = keys %waiting_workers;
+                                my $whdl = delete $waiting_workers{$worker};
+                                $whdl->push_write(json => $json);
+                            } else {
+                                push @queue, $json;
+                            }
+                            $hdl->push_write(json => {status => 'ok', msg => 'queued'});
                         }
                 });
             });
