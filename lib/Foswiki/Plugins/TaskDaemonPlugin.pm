@@ -73,27 +73,22 @@ sub launchWorker {
         my $oldHost = $Foswiki::cfg{DefaultUrlHost};
         $Foswiki::cfg{DefaultUrlHost} = $json->{host} if $json->{host};
 
-        if ($json->{type} eq 'update_topic') {
-            my $indexer = Foswiki::Plugins::SolrPlugin::getIndexer($session);
-
-            my ($web, $topic) = Foswiki::Func::normalizeWebTopicName(undef, $json->{data});
+        my $indexer = Foswiki::Plugins::SolrPlugin::getIndexer($session);
+        my ($web, $topic) = Foswiki::Func::normalizeWebTopicName(undef, $json->{data});
+        my $t = $json->{type};
+        if ($t eq 'update_topic') {
             eval { $indexer->updateTopic($web, $topic); $indexer->commit(1); };
             if ($@) {
                 Foswiki::Func::writeWarning( "Worker: update_topic exception: $@" );
             }
-        } elsif ($json->{type} eq 'update_web') {
-            my $indexer = Foswiki::Plugins::SolrPlugin::getIndexer($session);
-
-            my ($web, $topic) = Foswiki::Func::normalizeWebTopicName($json->{data});
+        } elsif ($t eq 'update_web') {
             eval { $indexer->update($web); $indexer->commit(1); };
             if ($@) {
                 Foswiki::Func::writeWarning( "Worker: update_web exception: $@" );
             }
-        } elsif ($json->{type} eq 'flush_acls') {
             Foswiki::Func::wrtieWarning("flushing acls") if DEBUG;
-            my $indexer = Foswiki::Plugins::SolrPlugin::getIndexer($session);
             $indexer->finish();
-        } elsif ($json->{type} eq 'exit_worker') {
+        } elsif ($t eq 'exit_worker') {
             $exitWorker->send;
             return;
         }
