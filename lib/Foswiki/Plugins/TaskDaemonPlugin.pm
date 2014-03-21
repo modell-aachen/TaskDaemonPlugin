@@ -79,18 +79,18 @@ sub launchWorker {
         if ($t eq 'update_topic') {
             eval { $indexer->updateTopic($web, $topic); $indexer->commit(1); };
             if ($@) {
-                Foswiki::Func::writeWarning( "Worker: update_topic exception: $@" );
+                print "Worker: update_topic exception: $@\n";
             }
         } elsif ($t eq 'update_web') {
             eval { $indexer->update($web); $indexer->commit(1); };
             if ($@) {
-                Foswiki::Func::writeWarning( "Worker: update_web exception: $@" );
+                print "Worker: update_web exception: $@\n";
             }
         } elsif ($t eq 'flush_acls') {
-            print STDERR "Flush web ACL cache\n";
+            print "Flush web ACL cache\n";
             $indexer->clearWebACLs();
         } elsif ($t eq 'flush_groups') {
-            print STDERR "Flush group membership cache\n";
+            print "Flush group membership cache\n";
             $indexer->finish();
         } elsif ($t eq 'exit_worker') {
             $exitWorker->send;
@@ -110,12 +110,12 @@ sub launchWorker {
             $hdl->push_read(@read);
         },
         on_connect_error => sub {
-            Foswiki::Func::writeWarning( "Worker: failed to connect to MATT daemon: $!" );
+            print "Worker: failed to connect to MATT daemon: $!\n";
             exit();
         },
         on_error => sub {
             my ($hdl, $fatal, $message) = @_;
-            Foswiki::Func::writeWarning( "Worker: error in connection to MATT daemon: $message" );
+            print "Worker: error in connection to MATT daemon: $message\n";
             $hdl->destroy unless $fatal;
         },
     );
