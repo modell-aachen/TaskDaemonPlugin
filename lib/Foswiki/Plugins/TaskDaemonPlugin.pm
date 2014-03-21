@@ -86,7 +86,11 @@ sub launchWorker {
             if ($@) {
                 Foswiki::Func::writeWarning( "Worker: update_web exception: $@" );
             }
-            Foswiki::Func::wrtieWarning("flushing acls") if DEBUG;
+        } elsif ($t eq 'flush_acls') {
+            print STDERR "Flush web ACL cache\n";
+            $indexer->clearWebACLs();
+        } elsif ($t eq 'flush_groups') {
+            print STDERR "Flush group membership cache\n";
             $indexer->finish();
         } elsif ($t eq 'exit_worker') {
             $exitWorker->send;
@@ -119,15 +123,30 @@ sub launchWorker {
     $hdl->destroy;
 }
 
+my @flushCmd;
+
+sub beforeSaveHandler {
+    my ( $text, $topic, $web, $meta ) = @_;
+
+    return unless $topic eq $Foswiki::cfg{WebPrefsTopicName};
+
+    my ($oldMeta) = Foswiki::Func::readTopic($web, $topic);
+    if ($oldMeta->getPreference('ALLOWWEBVIEW') ne $meta->getPreference('ALLOWWEBVIEW') ||
+            $oldMeta->getPreference('DENYWEBVIEW') ne $meta->getPreference('DENYWEBVIEW')) {
+        @flushCmd = ([$web, 'flush_acls'], [$web, 'update_web']);
+    }
+}
+
 sub afterSaveHandler {
     my ( $text, $topic, $web, $error, $meta ) = @_;
 
-    if($topic eq $Foswiki::cfg{WebPrefsTopicName}) {
-        _send($web, 'flush_acls'); # XXX check if ACLs/workflow changed
-        _send($web, 'update_web');
-    } else {
+    foreach my $cmd (@flushCmd) {
+        _send(@$cmd);
+    }
+    if (!@flushCmd) {
         _send("$web.$topic");
     }
+    undef @flushCmd;
 }
 
 sub afterRenameHandler {
@@ -145,6 +164,19 @@ sub afterRenameHandler {
              _send("$newWeb.$newTopic");
          }
      }
+}
+
+sub completePageHandler {
+    my( $html, $httpHeaders ) = @_;
+
+    my $session = $Foswiki::Plugins::SESSION;
+    my $req = $session->{request};
+    if ($req->action eq 'manage' && $req->param('action') =~ /^(?:add|remove)User(?:To|From)Group$/ ||
+        $req->param('refreshldap'))
+    {
+        _send('', 'flush_groups');
+        _send("$Foswiki::cfg{UsersWebName}.". $req->param('groupname')) if $req->param('groupname');
+    }
 }
 
 # Disabled -> let afterSave handle it
