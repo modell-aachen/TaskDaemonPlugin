@@ -28,12 +28,12 @@ sub run {
     tcp_server('127.0.0.1', 8090, sub {
             my ($fh, $host, $port) = @_;
             my $cid = "$host:$port";
-            print "client connected from $host:$port\n";
+            print "client connected from $cid\n";
             my $buffer;
             my $disconnect = sub {
-                my $id = shift || $cid;
-                delete $clients{$id};
-                delete $waiting_workers{$id};
+                print "client at $cid disconnected\n";
+                delete $clients{$cid};
+                delete $waiting_workers{$cid};
             };
             my $hdl = new AnyEvent::Handle(fh => $fh);
             $hdl->on_read(sub {
