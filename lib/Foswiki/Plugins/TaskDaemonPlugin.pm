@@ -116,6 +116,7 @@ sub launchWorker {
         },
     );
     $exitWorker->recv;
+    $hdl->destroy;
 }
 
 sub afterSaveHandler {
