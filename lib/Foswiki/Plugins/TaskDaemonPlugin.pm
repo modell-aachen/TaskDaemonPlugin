@@ -113,10 +113,14 @@ sub launchWorker {
             print "Worker: failed to connect to MATT daemon: $!\n";
             exit();
         },
+        on_eof => sub {
+            print "Worker: MATT daemon closed the connection, exiting\n";
+            exit();
+        },
         on_error => sub {
             my ($hdl, $fatal, $message) = @_;
             print "Worker: error in connection to MATT daemon: $message\n";
-            $hdl->destroy unless $fatal;
+            exit();
         },
     );
     $exitWorker->recv;
