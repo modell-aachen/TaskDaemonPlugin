@@ -33,6 +33,8 @@ sub initPlugin {
         return 0;
     }
 
+    Foswiki::Func::registerRESTHandler( 'index', \&_restIndex, authenticate => 1, 'http_allow' => 'POST' );
+
     # Plugin correctly initialized
     return 1;
 }
@@ -159,6 +161,28 @@ sub afterUploadHandlerDisabled {
     _send("$web.$topic");
 }
 
+sub _restIndex {
+    my ( $session, $subject, $verb, $response ) = @_;
+
+    my $params = $session->{request}->{param};
+    my ($web, $topic) = Foswiki::Func::normalizeWebTopicName( $params->{w}[0], $params->{t}[0] );
+
+    $web = '' if ( !$params->{w}[0] );
+    $topic = '' if ( !$params->{t}[0] );
+
+    if ( !$web || !Foswiki::Func::webExists( $web ) ) {
+        $response->status( 400 );
+        return;
+    }
+
+    if ( $topic ) {
+        _send( "$web.$topic" );
+    } else {
+        _send( $web, "update_web" );
+    }
+
+    $response->status( 200 );
+}
 
 1;
 
