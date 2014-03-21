@@ -6,12 +6,16 @@ package MATTDaemon;
 use AnyEvent::Handle;
 use AnyEvent::Socket;
 
-my $dir = '/srv/www/1.1.8/open';
-
 use constant DEBUG => 1;
+
 my @todos = ();
 
 sub run {
+    my $dir = $ENV{FOSWIKI_DIR};
+    unless($dir) {
+        print "Please set FOSWIKI_DIR to your Foswiki installation\n";
+        return;
+    }
     chdir("$dir/bin") or die "Could not change into $dir/bin";
     my $quitMatt = AnyEvent->condvar;
     my %clients;
