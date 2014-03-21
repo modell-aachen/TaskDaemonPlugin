@@ -16,7 +16,10 @@ sub run {
         print "Please set FOSWIKI_DIR to your Foswiki installation\n";
         return;
     }
-    chdir("$dir/bin") or die "Could not change into $dir/bin";
+    unless(chdir("$dir/bin")) {
+       print "Could not change into $dir/bin\n";
+       return;
+    }
     my $quitMatt = AnyEvent->condvar;
     my %clients;
     my @queue;
