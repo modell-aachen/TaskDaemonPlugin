@@ -9,6 +9,7 @@ use AnyEvent::Socket;
 use constant DEBUG => 1;
 
 my @todos = ();
+my $hosts = {};
 
 sub run {
     my $dir = $ENV{FOSWIKI_DIR};
@@ -39,21 +40,30 @@ sub run {
             $hdl->on_read(sub {
                 $hdl->push_read(json => sub {
                         my ($hdl, $json) = @_;
+                        my $type = $json->{type};
+                        my $host = $json->{host} || 'default';
 
-                        unless ($json->{type}) {
+                        unless ($type) {
                             $hdl->push_write(json => {
                                     status => 'error',
                                     msg => 'message was missing type arg'
                             });
                             return;
                         }
-                        if ($json->{type} eq 'worker_idle') {
+                        if ($type eq 'worker_idle') {
                             if (@queue) {
                                 $hdl->push_write(json => shift @queue);
                             } else {
                                 $waiting_workers{$cid} = $hdl;
                             }
-                        } elsif ($json->{type} eq 'harakiri') {
+                        } elsif ($type eq 'getCache') {
+                            $hdl->push_write(json => $hosts->{$host}{$json->{data}});
+                        } elsif ($type eq 'setCache') {
+                            $hosts->{$host} ||= {};
+                            $hosts->{$host}{$json->{data}{key}} = $json->{data}{value};
+                        } elsif ($type eq 'clearCache') {
+                            undef $hosts->{$host};
+                        } elsif ($type eq 'harakiri') {
                             foreach (keys %waiting_workers) {
                                 $waiting_workers{$_}->push_write(json => {type => 'exit_worker'});
                                 $disconnect->($_);
