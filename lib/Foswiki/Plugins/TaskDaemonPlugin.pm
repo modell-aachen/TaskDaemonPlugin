@@ -39,6 +39,23 @@ sub initPlugin {
     return 1;
 }
 
+sub grind {
+    my $session = shift;
+    my $type = $ENV{mattworker_type};
+    my $data = $ENV{mattworker_data};
+
+    my $indexer = Foswiki::Plugins::SolrPlugin::getIndexer($session);
+
+    if ($type eq 'update_topic') {
+        $indexer->updateTopic(undef, $data);
+        $indexer->commit(1);
+    }
+    elsif ($type eq 'update_web') {
+        $indexer->update($data);
+        $indexer->commit(1);
+    }
+}
+
 sub _send {
     my ($message, $type) = @_;
 
@@ -62,70 +79,6 @@ sub _send {
     };
 }
 
-sub launchWorker {
-    my $session = shift;
-    my $exitWorker = AnyEvent->condvar;
-    AE::signal INT => sub { $exitWorker->send; };
-
-    my @read; @read = (json => sub {
-        my ($hdl, $json) = @_;
-
-        my $oldHost = $Foswiki::cfg{DefaultUrlHost};
-        $Foswiki::cfg{DefaultUrlHost} = $json->{host} if $json->{host};
-
-        my $indexer = Foswiki::Plugins::SolrPlugin::getIndexer($session);
-        my ($web, $topic) = Foswiki::Func::normalizeWebTopicName(undef, $json->{data});
-        my $t = $json->{type};
-        if ($t eq 'update_topic') {
-            eval { $indexer->updateTopic($web, $topic); $indexer->commit(1); };
-            if ($@) {
-                print "Worker: update_topic exception: $@\n";
-            }
-        } elsif ($t eq 'update_web') {
-            eval { $indexer->update($web); $indexer->commit(1); };
-            if ($@) {
-                print "Worker: update_web exception: $@\n";
-            }
-        } elsif ($t eq 'flush_acls') {
-            print "Flush web ACL cache\n";
-            $indexer->clearWebACLs();
-        } elsif ($t eq 'flush_groups') {
-            print "Flush group membership cache\n";
-            $indexer->finish();
-        } elsif ($t eq 'exit_worker') {
-            $exitWorker->send;
-            return;
-        }
-
-        $Foswiki::cfg{DefaultUrlHost} = $oldHost;
-
-        $hdl->push_write(json => {type => 'worker_idle'});
-        $hdl->push_read(@read);
-    });
-    my $hdl = new AnyEvent::Handle(
-        connect => ['127.0.0.1', 8090],
-        on_connect => sub {
-            my $hdl = shift;
-            $hdl->push_write(json => {type => 'worker_idle'});
-            $hdl->push_read(@read);
-        },
-        on_connect_error => sub {
-            print "Worker: failed to connect to MATT daemon: $!\n";
-            exit();
-        },
-        on_eof => sub {
-            print "Worker: MATT daemon closed the connection, exiting\n";
-            exit();
-        },
-        on_error => sub {
-            my ($hdl, $fatal, $message) = @_;
-            print "Worker: error in connection to MATT daemon: $message\n";
-            exit();
-        },
-    );
-    $exitWorker->recv;
-    $hdl->destroy;
-}
 
 my @flushCmd;
 

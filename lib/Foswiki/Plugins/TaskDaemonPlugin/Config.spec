@@ -3,6 +3,6 @@
 # **PERL H**
 $Foswiki::cfg{SwitchBoard}{mattworker} = {
     package => 'Foswiki::Plugins::TaskDaemonPlugin',
-    function => 'launchWorker',
+    function => 'grind',
     context => { 'mattworker' => 1 },
 };
