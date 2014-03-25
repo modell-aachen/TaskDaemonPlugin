@@ -52,27 +52,36 @@ sub run {
                         }
                         if ($type eq 'worker_idle') {
                             if (@queue) {
-                                $hdl->push_write(json => shift @queue);
+                                my $wdata = shift @queue;
+                                $wdata->{cache} = {};
+                                my @fields = @{$json->{cache_fields}};
+                                @{$wdata->{cache}}{@fields} = @{$hosts->{$host}}{@fields};
+                                $hdl->push_write(json => $wdata);
                             } else {
-                                $waiting_workers{$cid} = $hdl;
+                                $waiting_workers{$cid} = {
+                                    hdl => $hdl,
+                                    cache_fields => $json->{cache_fields},
+                                };
                             }
-                        } elsif ($type eq 'getCache') {
-                            $hdl->push_write(json => $hosts->{$host}{$json->{data}});
-                        } elsif ($type eq 'setCache') {
+                        } elsif ($type eq 'set_cache') {
                             $hosts->{$host} ||= {};
                             $hosts->{$host}{$json->{data}{key}} = $json->{data}{value};
-                        } elsif ($type eq 'clearCache') {
+                        } elsif ($type eq 'clear_cache') {
                             undef $hosts->{$host};
                         } elsif ($type eq 'harakiri') {
                             foreach (keys %waiting_workers) {
-                                $waiting_workers{$_}->push_write(json => {type => 'exit_worker'});
+                                $waiting_workers{$_}{hdl}->push_write(json => {type => 'exit_worker'});
                                 $disconnect->($_);
                             }
                         } else {
                             print "$json->{type}: $json->{data}\n" if DEBUG;
                             if (keys %waiting_workers) {
                                 my ($worker) = keys %waiting_workers;
-                                my $whdl = delete $waiting_workers{$worker};
+                                $worker = delete $waiting_workers{$worker};
+                                my $whdl = $worker->{hdl};
+                                $json->{cache} = {};
+                                my @fields = @{$worker->{cache_fields}};
+                                @{$json->{cache}}{@fields} = @{$hosts->{$host}}{@fields};
                                 $whdl->push_write(json => $json);
                             } else {
                                 push @queue, $json;

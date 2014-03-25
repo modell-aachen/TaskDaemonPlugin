@@ -38,6 +38,12 @@ use Foswiki ();
 use Foswiki::UI ();
 launchWorker();
 
+our %mattworker_data;
+
+sub _idle {
+    shift->push_write(json => {type => 'worker_idle', cache_fields => ['groups_members', 'web_acls'] });
+}
+
 sub launchWorker {
     my $exitWorker = AnyEvent->condvar;
     AE::signal INT => sub { $exitWorker->send; };
@@ -48,34 +54,43 @@ sub launchWorker {
         my $t = $json->{type};
         my $host = $json->{host};
         local $ENV{HTTP_HOST} = $host if defined $host;
-        $ENV{mattworker_type} = $t;
-        $ENV{mattworker_data} = $json->{data};
+        $mattworker_data{type} = $t;
+        $mattworker_data{data} = $json->{data};
 
         if ($t =~ m'update_topic|update_web') {
+            $mattworker_data{caches} = $json->{cache};
             eval { $Foswiki::engine->run(); };
             if ($@) {
                 print "Worker: $t exception: $@\n";
+            } else {
+                for my $c ('groups_members', 'web_acls') {
+                    $hdl->push_write(json => {
+                        type => 'set_cache',
+                        host => $host,
+                        data => {key => $c, value => $mattworker_data{caches}{$c}},
+                    });
+                }
             }
+            eval { $Foswiki::Plugins::SESSION->finish(); };
         } elsif ($t eq 'flush_acls') {
             print "Flush web ACL cache\n";
-            $hdl->push_write(json => {type => 'clearCache', host => $host});
+            $hdl->push_write(json => {type => 'clear_cache', host => $host});
         } elsif ($t eq 'flush_groups') {
             print "Flush group membership cache\n";
-            $hdl->push_write(json => {type => 'clearCache', host => $host});
+            $hdl->push_write(json => {type => 'clear_cache', host => $host});
         } elsif ($t eq 'exit_worker') {
             $exitWorker->send;
             return;
         }
 
-
-        $hdl->push_write(json => {type => 'worker_idle'});
+        _idle($hdl);
         $hdl->push_read(@read);
     });
     my $hdl = new AnyEvent::Handle(
         connect => ['127.0.0.1', 8090],
         on_connect => sub {
             my $hdl = shift;
-            $hdl->push_write(json => {type => 'worker_idle'});
+            _idle($hdl);
             $hdl->push_read(@read);
         },
         on_connect_error => sub {
