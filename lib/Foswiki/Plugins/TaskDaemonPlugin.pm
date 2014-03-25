@@ -41,10 +41,13 @@ sub initPlugin {
 
 sub grind {
     my $session = shift;
-    my $type = $ENV{mattworker_type};
-    my $data = $ENV{mattworker_data};
+    my $type = $main::mattworker_data{type};
+    my $data = $main::mattworker_data{data};
 
     my $indexer = Foswiki::Plugins::SolrPlugin::getIndexer($session);
+    my $caches = $main::mattworker_data{caches};
+    $indexer->groupsCache($caches->{groups_members}) if $caches->{groups_members};
+    $indexer->webACLsCache($caches->{web_acls}) if $caches->{web_acls};
 
     if ($type eq 'update_topic') {
         $indexer->updateTopic(undef, $data);
@@ -54,6 +57,12 @@ sub grind {
         $indexer->update($data);
         $indexer->commit(1);
     }
+
+    $main::mattworker_data{caches} = {
+        groups_members => $indexer->groupsCache(),
+        web_acls => $indexer->webACLsCache(),
+    };
+
 }
 
 sub _send {
@@ -70,9 +79,12 @@ sub _send {
 
     Foswiki::Func::writeWarning("sending '$type': '$message'") if DEBUG;
     if ($socket) {
+        my $host = $Foswiki::cfg{DefaultUrlHost};
+        $host =~ s#^https?://##;
         $socket->send(encode_json({
             type => $type,
             data => $message,
+            host => $host,
         }));
     } else {
         Foswiki::Func::writeWarning( "Realtime-indexing is offline!" );
