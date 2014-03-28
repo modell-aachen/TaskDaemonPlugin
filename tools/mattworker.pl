@@ -30,6 +30,7 @@ BEGIN {
   } elsif (-e '../bin/setlib.cfg') {
     unshift @INC, '../bin';
   }
+  $Foswiki::cfg{Engine} = 'Foswiki::Engine::CLI';
   $ENV{FOSWIKI_ACTION} = 'mattworker';
   require 'setlib.cfg';
 }
@@ -71,7 +72,6 @@ sub launchWorker {
                     });
                 }
             }
-            eval { $Foswiki::Plugins::SESSION->finish(); };
         } elsif ($t eq 'flush_acls') {
             print "Flush web ACL cache\n";
             $hdl->push_write(json => {type => 'clear_cache', host => $host});
