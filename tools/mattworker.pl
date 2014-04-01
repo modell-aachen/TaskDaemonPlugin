@@ -58,9 +58,21 @@ sub launchWorker {
         $mattworker_data{type} = $t;
         $mattworker_data{data} = $json->{data};
 
+        my $doit;
+        if ($ENV{VIRTUALHOSTS}) {
+            $doit = sub {
+                use Foswiki::Contrib::VirtualHostingContrib::VirtualHost ();
+                Foswiki::Contrib::VirtualHostingContrib::VirtualHost->run_on($host, sub { $Foswiki::engine->run(); } );
+            };
+        } else {
+            $doit = sub {
+                $Foswiki::engine->run(),
+            };
+        }
+
         if ($t =~ m'update_topic|update_web') {
             $mattworker_data{caches} = $json->{cache};
-            eval { $Foswiki::engine->run(); };
+            eval { $doit->(); };
             if ($@) {
                 print "Worker: $t exception: $@\n";
             } else {
