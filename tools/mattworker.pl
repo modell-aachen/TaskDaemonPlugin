@@ -61,7 +61,7 @@ sub launchWorker {
         my $doit;
         if ($ENV{VIRTUALHOSTS}) {
             $doit = sub {
-                use Foswiki::Contrib::VirtualHostingContrib::VirtualHost ();
+                require Foswiki::Contrib::VirtualHostingContrib::VirtualHost;
                 Foswiki::Contrib::VirtualHostingContrib::VirtualHost->run_on($host, sub { $Foswiki::engine->run(); } );
             };
         } else {
