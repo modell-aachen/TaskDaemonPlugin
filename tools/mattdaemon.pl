@@ -12,9 +12,9 @@ my @todos = ();
 my $hosts = {};
 
 sub run {
-    my $dir = $ENV{FOSWIKI_DIR};
+    my $dir = $ENV{FOSWIKI_ROOT};
     unless($dir) {
-        print "Please set FOSWIKI_DIR to your Foswiki installation\n";
+        print "Please set FOSWIKI_ROOT to your Foswiki installation\n";
         return;
     }
     unless(chdir("$dir/bin")) {
