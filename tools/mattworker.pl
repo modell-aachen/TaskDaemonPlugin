@@ -25,15 +25,27 @@ use JSON;
 
 # Set library paths in @INC, at compile time
 BEGIN {
-  if (-e './setlib.cfg') {
-    unshift @INC, '.';
-  } elsif (-e '../bin/setlib.cfg') {
-    unshift @INC, '../bin';
-  }
-  $Foswiki::cfg{Engine} = 'Foswiki::Engine::CLI';
-  $ENV{FOSWIKI_ACTION} = 'mattworker';
-  require 'setlib.cfg';
+    # check FOSWIKI_ROOT settings, change to /bin if possible
+    my $dir = $ENV{FOSWIKI_ROOT};
+    unless($dir) {
+        print "Please set FOSWIKI_ROOT to your Foswiki installation.\n";
+        exit 1;
+    }
+    unless(chdir("$dir/bin")) {
+        print "Could not change into $dir/bin\n";
+        exit 1;
+    }
+
+    if (-e './setlib.cfg') {
+        unshift @INC, '.';
+    } elsif (-e '../bin/setlib.cfg') {
+        unshift @INC, '../bin';
+    }
+    $Foswiki::cfg{Engine} = 'Foswiki::Engine::CLI';
+    $ENV{FOSWIKI_ACTION} = 'mattworker';
+    require 'setlib.cfg';
 }
+
 
 use Foswiki ();
 use Foswiki::UI ();
