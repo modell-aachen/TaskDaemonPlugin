@@ -122,7 +122,7 @@ sub launchWorker {
             exit();
         },
         on_eof => sub {
-            print "Worker: MATT daemon closed the connection, exiting\n";
+            print "Worker: MATT daemon closed the connection, exiting.\n";
             exit();
         },
         on_error => sub {

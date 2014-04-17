@@ -7,7 +7,7 @@ package MATTDaemon;
 use AnyEvent::Handle;
 use AnyEvent::Socket;
 
-use constant DEBUG => 1;
+use constant DEBUG => 0;
 
 my @todos = ();
 my $hosts = {};
@@ -15,11 +15,11 @@ my $hosts = {};
 sub run {
     my $dir = $ENV{FOSWIKI_ROOT};
     unless($dir) {
-        print "Please set FOSWIKI_ROOT to your Foswiki installation\n";
+        print "Please set FOSWIKI_ROOT to your Foswiki installation.\n";
         return;
     }
     unless(chdir("$dir/bin")) {
-       print "Could not change into $dir/bin\n";
+       print "Could not change into $dir/bin.\n";
        return;
     }
     my $quitMatt = AnyEvent->condvar;
