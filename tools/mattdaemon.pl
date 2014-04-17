@@ -1,3 +1,4 @@
+#!/usr/bin/perl -w
 require 5.004;
 use strict;
 use warnings;
