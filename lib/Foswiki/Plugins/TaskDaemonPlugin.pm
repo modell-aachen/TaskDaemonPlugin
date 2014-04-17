@@ -125,13 +125,9 @@ sub afterRenameHandler {
      if(not $oldTopic) {
          _send("$newWeb", 'update_web'); # old web will be deleted automatically
      } else {
-         if ("$oldWeb.$oldTopic" eq "$newWeb.$newTopic") {
-             # --> probably attachent
-             _send("$oldWeb.$oldTopic");
-         } else {
-             # newWeb.newTopic will cause a afterSaveHandler anyway _send("$oldWeb.$oldTopic\n$newWeb.$newTopic");
-             _send("$newWeb.$newTopic");
-         }
+         # topic rename will trigger the afterSaveHandler for the new topic anyway, and thus _send("$newWeb.$newTopic");
+         # no update of newWeb.newTopic necessary
+         _send("$oldWeb.$oldTopic");
      }
 }
 
@@ -186,9 +182,9 @@ sub _restIndex {
 __END__
 Foswiki - The Free and Open Source Wiki, http://foswiki.org/
 
-Author: MAOst
+Author: Stephan Osthold, Jan Krüger, Sven Meyer, Maik Glatki
 
-Copyright (C) 2008-2011 Foswiki Contributors. Foswiki Contributors
+Copyright (C) 2008-2014 Foswiki Contributors. Foswiki Contributors
 are listed in the AUTHORS file in the root of this distribution.
 NOTE: Please extend that file, not this notice.
 
