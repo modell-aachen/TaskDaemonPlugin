@@ -125,9 +125,11 @@ sub afterRenameHandler {
      if(not $oldTopic) {
          _send("$newWeb", 'update_web'); # old web will be deleted automatically
      } else {
-         # topic rename will trigger the afterSaveHandler for the new topic anyway, and thus _send("$newWeb.$newTopic");
-         # no update of newWeb.newTopic necessary
+         # XXX when a topic is being moved in the frontend a
+         # _send("$newWeb.$newTopic") will be fired by afterSaveHandler, since
+         # a %META:TOPICMOVED{...}% will be inserted
          _send("$oldWeb.$oldTopic");
+         _send("$newWeb.$newTopic");
      }
 }
 
