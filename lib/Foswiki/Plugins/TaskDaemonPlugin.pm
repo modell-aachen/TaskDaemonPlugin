@@ -72,7 +72,7 @@ sub _send {
 
     my $socket = new IO::Socket::INET->new(
         PeerAddr => 'localhost',
-        PeerPort => 8090,
+        PeerPort => $Foswiki::cfg{TaskDaemonPlugin}{port} || 8090,
         Proto => 'tcp',
         Timeout => 3
     );

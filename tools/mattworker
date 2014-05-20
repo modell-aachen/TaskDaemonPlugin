@@ -111,7 +111,7 @@ sub launchWorker {
         $hdl->push_read(@read);
     });
     my $hdl = new AnyEvent::Handle(
-        connect => ['127.0.0.1', 8090],
+        connect => ['127.0.0.1', $Foswiki::cfg{TaskDaemonPlugin}{port} || 8090],
         on_connect => sub {
             my $hdl = shift;
             _idle($hdl);

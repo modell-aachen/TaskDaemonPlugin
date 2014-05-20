@@ -6,3 +6,6 @@ $Foswiki::cfg{SwitchBoard}{mattworker} = {
     function => 'grind',
     context => { 'mattworker' => 1 },
 };
+
+# **NUMBER EXPERT**
+$Foswiki::cfg{TaskDaemonPlugin}{port} = '8090';

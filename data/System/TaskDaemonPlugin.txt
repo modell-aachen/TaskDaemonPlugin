@@ -10,7 +10,11 @@ One line description, required for extensions repository catalog.
 Learn how to create your own plugin in %SYSTEMWEB%.DevelopingPlugins.
 
 ---++ Preferences
-
+---+++ Port for daemon
+By default the daemon runs on port 8090. If you need to change that port you must
+   1. set the daemon in configure (expert option for TaskDaemonPlugin)
+   1. tell the daemon to use that port; this can be done via a command line parameter
+       <verbatim>mattdaemon port=12345</verbatim>
 
 ---++ Installation
 %$INSTALL_INSTRUCTIONS%

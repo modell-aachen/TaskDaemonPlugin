@@ -14,6 +14,14 @@ my $hosts = {};
 
 sub run {
     my $dir = $ENV{FOSWIKI_ROOT};
+    my $daemonport = 8090;
+    foreach my $param ( @ARGV ) {
+        if($param =~ m/^port=(\d+)$/) {
+            $daemonport = $1;
+        } else {
+            print "Unknown parameter: $param";
+        }
+    }
     unless($dir) {
         print "Please set FOSWIKI_ROOT to your Foswiki installation.\n";
         return;
@@ -27,13 +35,13 @@ sub run {
     my @queue;
     my %waiting_workers;
 
-    tcp_server('127.0.0.1', 8090, sub {
+    tcp_server('127.0.0.1', $daemonport, sub {
             my ($fh, $host, $port) = @_;
             my $cid = "$host:$port";
-            print "client connected from $cid\n";
+            print "(MATTDaemon:$daemonport) client connected from $cid\n";
             my $buffer;
             my $disconnect = sub {
-                print "client at $cid disconnected\n";
+                print "(MATTDaemon:$daemonport) client at $cid disconnected\n";
                 delete $clients{$cid};
                 delete $waiting_workers{$cid};
             };
