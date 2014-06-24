@@ -32,7 +32,7 @@ sub run {
     }
     my $quitMatt = AnyEvent->condvar;
     my %clients;
-    my @queue;
+    my %queues;
     my %waiting_workers;
 
     tcp_server('127.0.0.1', $daemonport, sub {
@@ -60,6 +60,9 @@ sub run {
                             return;
                         }
                         if ($type eq 'worker_idle') {
+                            my $department = $json->{department} || '';
+                            my @queue;
+                            @queue = @{$queues{$department}} if $queues{$department};
                             if (@queue) {
                                 my $wdata = shift @queue;
                                 $wdata->{cache} = {};
@@ -67,7 +70,7 @@ sub run {
                                 @{$wdata->{cache}}{@fields} = @{$hosts->{$host}}{@fields};
                                 $hdl->push_write(json => $wdata);
                             } else {
-                                $waiting_workers{$cid} = {
+                                $waiting_workers{$department}{$cid} = {
                                     hdl => $hdl,
                                     cache_fields => $json->{cache_fields},
                                 };
@@ -83,17 +86,19 @@ sub run {
                                 $disconnect->($_);
                             }
                         } else {
-                            print "$json->{type}: $json->{data}\n" if DEBUG;
-                            if (keys %waiting_workers) {
-                                my ($worker) = keys %waiting_workers;
-                                $worker = delete $waiting_workers{$worker};
+                            my $department = $json->{department};
+                            print "$department - $json->{type}: $json->{data}\n" if DEBUG;
+                            if (keys %{$waiting_workers{$department}}) {
+                                my ($worker) = keys %{$waiting_workers{$department}};
+                                $worker = delete $waiting_workers{$department}{$worker};
                                 my $whdl = $worker->{hdl};
                                 $json->{cache} = {};
                                 my @fields = @{$worker->{cache_fields}};
                                 @{$json->{cache}}{@fields} = @{$hosts->{$host}}{@fields};
                                 $whdl->push_write(json => $json);
                             } else {
-                                push @queue, $json;
+                                $queues{$department} = () unless $queues{$department};
+                                push @{$queues{$department}}, $json;
                             }
                             $hdl->push_write(json => {status => 'ok', msg => 'queued'});
                         }
