@@ -66,9 +66,7 @@ sub grind {
 }
 
 sub _send {
-    my ($message, $type) = @_;
-
-    $type ||= 'update_topic';
+    my ($message, $type, $department) = @_;
 
     my $socket = new IO::Socket::INET->new(
         PeerAddr => 'localhost',
@@ -85,6 +83,7 @@ sub _send {
             type => $type,
             data => $message,
             host => $host,
+            department => $department,
         }));
     } else {
         Foswiki::Func::writeWarning( "Realtime-indexing is offline!" );
@@ -102,7 +101,7 @@ sub beforeSaveHandler {
     my ($oldMeta) = Foswiki::Func::readTopic($web, $topic);
     if ($oldMeta->getPreference('ALLOWWEBVIEW') ne $meta->getPreference('ALLOWWEBVIEW') ||
             $oldMeta->getPreference('DENYWEBVIEW') ne $meta->getPreference('DENYWEBVIEW')) {
-        @flushCmd = ([$web, 'flush_acls'], [$web, 'update_web']);
+        @flushCmd = ([$web, 'flush_acls', 'solr'], [$web, 'update_web', 'solr']);
     }
 }
 
@@ -113,7 +112,7 @@ sub afterSaveHandler {
         _send(@$cmd);
     }
     if (!@flushCmd) {
-        _send("$web.$topic");
+        _send("$web.$topic", 'update_topic', 'solr');
     }
     undef @flushCmd;
 }
@@ -123,13 +122,13 @@ sub afterRenameHandler {
          $newWeb, $newTopic, $newAttachment ) = @_;
 
      if(not $oldTopic) {
-         _send("$newWeb", 'update_web'); # old web will be deleted automatically
+         _send("$newWeb", 'update_web', 'solr'); # old web will be deleted automatically
      } else {
          # XXX when a topic is being moved in the frontend a
          # _send("$newWeb.$newTopic") will be fired by afterSaveHandler, since
          # a %META:TOPICMOVED{...}% will be inserted
-         _send("$oldWeb.$oldTopic");
-         _send("$newWeb.$newTopic");
+         _send("$oldWeb.$oldTopic", 'update_topic', 'solr');
+         _send("$newWeb.$newTopic", 'update_topic', 'solr');
      }
 }
 
@@ -141,8 +140,8 @@ sub completePageHandler {
     if ($req->action eq 'manage' && $req->param('action') =~ /^(?:add|remove)User(?:To|From)Group$/ ||
         $req->param('refreshldap'))
     {
-        _send('', 'flush_groups');
-        _send("$Foswiki::cfg{UsersWebName}.". $req->param('groupname')) if $req->param('groupname');
+        _send('', 'flush_groups', 'solr');
+        _send("$Foswiki::cfg{UsersWebName}.". $req->param('groupname'), 'update_topic', 'solr') if $req->param('groupname');
     }
 }
 
@@ -153,7 +152,7 @@ sub afterUploadHandlerDisabled {
     my $web = $meta->web();
     my $topic = $meta->topic();
 
-    _send("$web.$topic");
+    _send("$web.$topic", 'update_topic', 'solr');
 }
 
 sub _restIndex {
@@ -171,9 +170,9 @@ sub _restIndex {
     }
 
     if ( $topic ) {
-        _send( "$web.$topic" );
+        _send( "$web.$topic", 'update_topic', 'solr' );
     } else {
-        _send( $web, "update_web" );
+        _send( $web, "update_web", 'solr' );
     }
 
     $response->status( 200 );

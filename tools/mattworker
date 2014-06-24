@@ -51,10 +51,12 @@ use Foswiki ();
 use Foswiki::UI ();
 launchWorker();
 
+use constant DEPARTMENT => 'solr';
+
 our %mattworker_data;
 
 sub _idle {
-    shift->push_write(json => {type => 'worker_idle', cache_fields => ['groups_members', 'web_acls'] });
+    shift->push_write(json => {department => DEPARTMENT, type => 'worker_idle', cache_fields => ['groups_members', 'web_acls'] });
 }
 
 sub launchWorker {
