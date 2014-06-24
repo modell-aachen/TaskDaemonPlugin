@@ -1,5 +1,6 @@
 data/System/TaskDaemonPlugin.txt 0644 Documentation page
 lib/Foswiki/Plugins/TaskDaemonPlugin.pm 0444 Perl module
 lib/Foswiki/Plugins/TaskDaemonPlugin/Config.spec 0444 Configuration
+lib/Foswiki/Plugins/TaskDaemonPlugin/Grinder.pm 0444 Task grinder
 tools/mattdaemon 0755
 tools/mattworker 0755
