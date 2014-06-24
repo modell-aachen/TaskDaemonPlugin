@@ -43,29 +43,13 @@ sub grind {
     my $session = shift;
     my $type = $main::mattworker_data{type};
     my $data = $main::mattworker_data{data};
-
-    my $indexer = Foswiki::Plugins::SolrPlugin::getIndexer($session);
     my $caches = $main::mattworker_data{caches};
-    $indexer->groupsCache($caches->{groups_members}) if $caches->{groups_members};
-    $indexer->webACLsCache($caches->{web_acls}) if $caches->{web_acls};
 
-    if ($type eq 'update_topic') {
-        $indexer->updateTopic(undef, $data);
-        $indexer->commit(1);
-    }
-    elsif ($type eq 'update_web') {
-        $indexer->update($data);
-        $indexer->commit(1);
-    }
-
-    $main::mattworker_data{caches} = {
-        groups_members => $indexer->groupsCache(),
-        web_acls => $indexer->webACLsCache(),
-    };
+    $main::mattworker_data{handlers}{engine_part}->($session, $type, $data, $caches);
 
 }
 
-sub _send {
+sub send {
     my ($message, $type, $department) = @_;
 
     my $socket = new IO::Socket::INET->new(
@@ -90,93 +74,6 @@ sub _send {
     };
 }
 
-
-my @flushCmd;
-
-sub beforeSaveHandler {
-    my ( $text, $topic, $web, $meta ) = @_;
-
-    return unless $topic eq $Foswiki::cfg{WebPrefsTopicName};
-
-    my ($oldMeta) = Foswiki::Func::readTopic($web, $topic);
-    if ($oldMeta->getPreference('ALLOWWEBVIEW') ne $meta->getPreference('ALLOWWEBVIEW') ||
-            $oldMeta->getPreference('DENYWEBVIEW') ne $meta->getPreference('DENYWEBVIEW')) {
-        @flushCmd = ([$web, 'flush_acls', 'solr'], [$web, 'update_web', 'solr']);
-    }
-}
-
-sub afterSaveHandler {
-    my ( $text, $topic, $web, $error, $meta ) = @_;
-
-    foreach my $cmd (@flushCmd) {
-        _send(@$cmd);
-    }
-    if (!@flushCmd) {
-        _send("$web.$topic", 'update_topic', 'solr');
-    }
-    undef @flushCmd;
-}
-
-sub afterRenameHandler {
-    my ( $oldWeb, $oldTopic, $oldAttachment,
-         $newWeb, $newTopic, $newAttachment ) = @_;
-
-     if(not $oldTopic) {
-         _send("$newWeb", 'update_web', 'solr'); # old web will be deleted automatically
-     } else {
-         # XXX when a topic is being moved in the frontend a
-         # _send("$newWeb.$newTopic") will be fired by afterSaveHandler, since
-         # a %META:TOPICMOVED{...}% will be inserted
-         _send("$oldWeb.$oldTopic", 'update_topic', 'solr');
-         _send("$newWeb.$newTopic", 'update_topic', 'solr');
-     }
-}
-
-sub completePageHandler {
-    my( $html, $httpHeaders ) = @_;
-
-    my $session = $Foswiki::Plugins::SESSION;
-    my $req = $session->{request};
-    if ($req->action eq 'manage' && $req->param('action') =~ /^(?:add|remove)User(?:To|From)Group$/ ||
-        $req->param('refreshldap'))
-    {
-        _send('', 'flush_groups', 'solr');
-        _send("$Foswiki::cfg{UsersWebName}.". $req->param('groupname'), 'update_topic', 'solr') if $req->param('groupname');
-    }
-}
-
-# Disabled -> let afterSave handle it
-sub afterUploadHandlerDisabled {
-    my( $attrHashRef, $meta ) = @_;
-
-    my $web = $meta->web();
-    my $topic = $meta->topic();
-
-    _send("$web.$topic", 'update_topic', 'solr');
-}
-
-sub _restIndex {
-    my ( $session, $subject, $verb, $response ) = @_;
-
-    my $params = $session->{request}->{param};
-    my ($web, $topic) = Foswiki::Func::normalizeWebTopicName( $params->{w}[0], $params->{t}[0] );
-
-    $web = '' if ( !$params->{w}[0] );
-    $topic = '' if ( !$params->{t}[0] );
-
-    if ( !$web || !Foswiki::Func::webExists( $web ) ) {
-        $response->status( 400 );
-        return;
-    }
-
-    if ( $topic ) {
-        _send( "$web.$topic", 'update_topic', 'solr' );
-    } else {
-        _send( $web, "update_web", 'solr' );
-    }
-
-    $response->status( 200 );
-}
 
 1;
 
