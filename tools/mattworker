@@ -51,17 +51,20 @@ use Foswiki ();
 use Foswiki::UI ();
 launchWorker();
 
-use constant DEPARTMENT => 'solr';
-
 our %mattworker_data;
 
 sub _idle {
-    shift->push_write(json => {department => DEPARTMENT, type => 'worker_idle', cache_fields => ['groups_members', 'web_acls'] });
+    shift->push_write(json => {department => $mattworker_data{department}, type => 'worker_idle', cache_fields => ['groups_members', 'web_acls'] });
 }
 
 sub launchWorker {
     my $exitWorker = AnyEvent->condvar;
     AE::signal INT => sub { $exitWorker->send; };
+
+    my $department = $ENV{MW_DEPARTMENT};
+    my $handlers = require "Foswiki/Plugins/${department}/Grinder.pm";
+    $mattworker_data{department} = $department;
+    $mattworker_data{handlers} = $handlers;
 
     my @read; @read = (json => sub {
         my ($hdl, $json) = @_;
@@ -72,41 +75,23 @@ sub launchWorker {
         $mattworker_data{type} = $t;
         $mattworker_data{data} = $json->{data};
 
-        my $doit;
+        my $run_engine;
         if ($ENV{VIRTUALHOSTS}) {
-            $doit = sub {
+            $run_engine = sub {
                 require Foswiki::Contrib::VirtualHostingContrib::VirtualHost;
                 Foswiki::Contrib::VirtualHostingContrib::VirtualHost->run_on($host, sub { $Foswiki::engine->run(); } );
             };
         } else {
-            $doit = sub {
+            $run_engine = sub {
                 $Foswiki::engine->run(),
             };
         }
 
-        if ($t =~ m'update_topic|update_web') {
-            $mattworker_data{caches} = $json->{cache};
-            eval { $doit->(); };
-            if ($@) {
-                print "Worker: $t exception: $@\n";
-            } else {
-                for my $c ('groups_members', 'web_acls') {
-                    $hdl->push_write(json => {
-                        type => 'set_cache',
-                        host => $host,
-                        data => {key => $c, value => $mattworker_data{caches}{$c}},
-                    });
-                }
-            }
-        } elsif ($t eq 'flush_acls') {
-            print "Flush web ACL cache\n";
-            $hdl->push_write(json => {type => 'clear_cache', host => $host});
-        } elsif ($t eq 'flush_groups') {
-            print "Flush group membership cache\n";
-            $hdl->push_write(json => {type => 'clear_cache', host => $host});
-        } elsif ($t eq 'exit_worker') {
+        if ($t eq 'exit_worker') {
             $exitWorker->send;
             return;
+        } else {
+            $handlers->{handle_message}->($host, $t, $hdl, $run_engine, $json);
         }
 
         _idle($hdl);
