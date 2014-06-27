@@ -80,6 +80,9 @@ sub run {
                             $hosts->{$host}{$json->{data}{key}} = $json->{data}{value};
                         } elsif ($type eq 'clear_cache') {
                             undef $hosts->{$host};
+                        } elsif ($type eq 'msg_to_client') {
+                            return if !exists $clients{$json->{cid}};
+                            $clients{$json->{cid}}->push_write(json => $json->{data});
                         } elsif ($type eq 'harakiri') {
                             foreach (keys %waiting_workers) {
                                 $waiting_workers{$_}{hdl}->push_write(json => {type => 'exit_worker'});
@@ -88,6 +91,8 @@ sub run {
                         } else {
                             my $department = $json->{department};
                             print "$department - $json->{type}: $json->{data}\n" if DEBUG;
+                            my $wait = $json->{_wait};
+                            $json->{_wait} = $cid if $wait;
                             if (keys %{$waiting_workers{$department}}) {
                                 my ($worker) = keys %{$waiting_workers{$department}};
                                 $worker = delete $waiting_workers{$department}{$worker};
@@ -100,7 +105,9 @@ sub run {
                                 $queues{$department} = () unless $queues{$department};
                                 push @{$queues{$department}}, $json;
                             }
-                            $hdl->push_write(json => {status => 'ok', msg => 'queued'});
+                            unless ($wait) {
+                                $hdl->push_write(json => {status => 'ok', msg => 'queued'});
+                            }
                         }
                 });
             });
