@@ -92,15 +92,23 @@ sub launchWorker {
             $exitWorker->send;
             return;
         } else {
-            my $response = $handlers->{handle_message}->($host, $t, $hdl, $run_engine, $json);
-            if (exists $response->{caches}) {
-                while (my ($k, $v) = each %{$response->{caches}}) {
+            my $result = $handlers->{handle_message}->($host, $t, $hdl, $run_engine, $json);
+            if (exists $result->{caches}) {
+                while (my ($k, $v) = each %{$result->{caches}}) {
                     $hdl->push_write(json => {
                         type => 'set_cache',
                         host => $host,
                         data => {key => $k, value => $v},
                     });
                 }
+            }
+            if ($json->{_wait}) {
+                my $response = $result->{response} || '(no response supplied)';
+                $hdl->push_write(json => {
+                    type => 'msg_to_client',
+                    cid => $json->{_wait},
+                    data => $response,
+                });
             }
         }
 
