@@ -50,7 +50,7 @@ sub grind {
 }
 
 sub send {
-    my ($message, $type, $department) = @_;
+    my ($message, $type, $department, $wait) = @_;
 
     my $socket = new IO::Socket::INET->new(
         PeerAddr => 'localhost',
@@ -68,7 +68,13 @@ sub send {
             data => $message,
             host => $host,
             department => $department,
+            _wait => $wait || 0,
         }));
+        if($wait) {
+            my $response;
+            $socket->recv($response, 1234);
+            return decode_json($response);
+        }
     } else {
         Foswiki::Func::writeWarning( "Realtime-indexing is offline!" );
     };

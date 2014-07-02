@@ -34,6 +34,7 @@ sub run {
     my %clients;
     my %queues;
     my %waiting_workers;
+    my %waiting2dep;
 
     tcp_server('127.0.0.1', $daemonport, sub {
             my ($fh, $host, $port) = @_;
@@ -43,7 +44,8 @@ sub run {
             my $disconnect = sub {
                 print "(MATTDaemon:$daemonport) client at $cid disconnected\n";
                 delete $clients{$cid};
-                delete $waiting_workers{$cid};
+                return unless exists $waiting2dep{$cid};
+                delete $waiting_workers{$waiting2dep{$cid}}{$cid};
             };
             my $hdl = new AnyEvent::Handle(fh => $fh);
             $hdl->on_read(sub {
@@ -61,15 +63,15 @@ sub run {
                         }
                         if ($type eq 'worker_idle') {
                             my $department = $json->{department} || '';
-                            my @queue;
-                            @queue = @{$queues{$department}} if $queues{$department};
-                            if (@queue) {
-                                my $wdata = shift @queue;
+                            my $queue = $queues{$department};
+                            if (ref $queue && @$queue) {
+                                my $wdata = shift @$queue;
                                 $wdata->{cache} = {};
                                 my @fields = @{$json->{cache_fields}};
                                 @{$wdata->{cache}}{@fields} = @{$hosts->{$host}}{@fields};
                                 $hdl->push_write(json => $wdata);
                             } else {
+                                $waiting2dep{$cid} = $department;
                                 $waiting_workers{$department}{$cid} = {
                                     hdl => $hdl,
                                     cache_fields => $json->{cache_fields},
@@ -82,7 +84,7 @@ sub run {
                             undef $hosts->{$host};
                         } elsif ($type eq 'msg_to_client') {
                             return if !exists $clients{$json->{cid}};
-                            $clients{$json->{cid}}->push_write(json => $json->{data});
+                            $clients{$json->{cid}}->push_write(json => {data => $json->{data}});
                         } elsif ($type eq 'harakiri') {
                             foreach (keys %waiting_workers) {
                                 $waiting_workers{$_}{hdl}->push_write(json => {type => 'exit_worker'});
