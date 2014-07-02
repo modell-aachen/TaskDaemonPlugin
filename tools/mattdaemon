@@ -39,10 +39,10 @@ sub run {
     tcp_server('127.0.0.1', $daemonport, sub {
             my ($fh, $host, $port) = @_;
             my $cid = "$host:$port";
-            print "(MATTDaemon:$daemonport) client connected from $cid\n";
+            print "(MATTDaemon:$$:$daemonport) client connected from $cid\n";
             my $buffer;
             my $disconnect = sub {
-                print "(MATTDaemon:$daemonport) client at $cid disconnected\n";
+                print "(MATTDaemon:$$:$daemonport) client at $cid disconnected\n";
                 delete $clients{$cid};
                 return unless exists $waiting2dep{$cid};
                 delete $waiting_workers{$waiting2dep{$cid}}{$cid};
