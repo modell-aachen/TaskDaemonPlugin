@@ -21,7 +21,7 @@ our $SHORTDESCRIPTION = 'Modell Aachen Task and Topic Daemon.';
 
 our $NO_PREFS_IN_TOPIC = 1;
 
-use constant DEBUG => 1;
+use constant DEBUG => 0;
 
 sub initPlugin {
     my ( $topic, $web, $user, $installWeb ) = @_;
