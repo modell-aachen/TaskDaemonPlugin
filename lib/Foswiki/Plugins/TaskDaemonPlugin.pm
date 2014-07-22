@@ -17,11 +17,11 @@ use JSON;
 
 our $VERSION = '1.0';
 our $RELEASE = '1.0';
-our $SHORTDESCRIPTION = 'Simple example on how to get around IWatch.';
+our $SHORTDESCRIPTION = 'Modell Aachen Task and Topic Daemon.';
 
 our $NO_PREFS_IN_TOPIC = 1;
 
-use constant DEBUG => 0;
+use constant DEBUG => 1;
 
 sub initPlugin {
     my ( $topic, $web, $user, $installWeb ) = @_;
@@ -32,8 +32,6 @@ sub initPlugin {
             __PACKAGE__, ' and Plugins.pm' );
         return 0;
     }
-
-    Foswiki::Func::registerRESTHandler( 'index', \&_restIndex, authenticate => 1, 'http_allow' => 'POST' );
 
     # Plugin correctly initialized
     return 1;
@@ -46,21 +44,19 @@ sub grind {
     my $caches = $main::mattworker_data{caches};
 
     $main::mattworker_data{handlers}{engine_part}->($session, $type, $data, $caches);
-
 }
 
+# send message to TaskDaemon
 sub send {
     my ($message, $type, $department, $wait) = @_;
 
-    my $socket = new IO::Socket::INET->new(
-        PeerAddr => 'localhost',
-        PeerPort => $Foswiki::cfg{TaskDaemonPlugin}{port} || 8090,
+    if ( my $socket = new IO::Socket::INET->new(
+        PeerAddr => $Foswiki::cfg{TaskDaemonPlugin}{Address} || 127.0.0.1,
+        PeerPort => $Foswiki::cfg{TaskDaemonPlugin}{Port} || 8090,
         Proto => 'tcp',
-        Timeout => 3
-    );
-
-    Foswiki::Func::writeWarning("sending '$type': '$message'") if DEBUG;
-    if ($socket) {
+        Timeout => 3)
+    ) {
+        Foswiki::Func::writeWarning("Sending '$type': '$message' to TaskDaemon") if DEBUG;
         my $host = $Foswiki::cfg{DefaultUrlHost};
         $host =~ s#^https?://##;
         $socket->send(encode_json({
@@ -75,9 +71,7 @@ sub send {
             $socket->recv($response, 1234);
             return decode_json($response);
         }
-    } else {
-        Foswiki::Func::writeWarning( "Realtime-indexing is offline!" );
-    };
+    } else { Foswiki::Func::writeWarning( "Can not bind to TaskDaemon: $@" )};
 }
 
 

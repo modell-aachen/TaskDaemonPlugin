@@ -1,4 +1,18 @@
 #!/usr/bin/perl -w
+# Copyright (C) 2014 Modell Aachen GmbH
+#
+# For licensing info read LICENSE file in the Foswiki root.
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details, published at 
+# http://www.gnu.org/copyleft/gpl.html
+
 require 5.004;
 use strict;
 use warnings;
@@ -6,43 +20,76 @@ use warnings;
 package MATTDaemon;
 use AnyEvent::Handle;
 use AnyEvent::Socket;
+use Getopt::Long;
+use Log::Dispatch;
 
 use constant DEBUG => 0;
+use constant DEFAULTPORT => 8090;
+use constant DEFAULTADDRESS => '127.0.0.1';
 
 my @todos = ();
 my $hosts = {};
 
+my $loglevel="info";
+if ( DEBUG ) { $loglevel = "debug"; }
+
+my $log = Log::Dispatch->new(
+    outputs => [
+        [ 'Syslog', min_level => $loglevel, ident => 'MATTDaemon'],
+    ],
+);
+
 sub run {
+    # check FOSWIKI_ROOT settings, change to /bin if possible
     my $dir = $ENV{FOSWIKI_ROOT};
-    my $daemonport = 8090;
-    foreach my $param ( @ARGV ) {
-        if($param =~ m/^port=(\d+)$/) {
-            $daemonport = $1;
-        } else {
-            print "Unknown parameter: $param";
-        }
-    }
     unless($dir) {
-        print "Please set FOSWIKI_ROOT to your Foswiki installation.\n";
-        return;
+        $log->error("Please set FOSWIKI_ROOT to your Foswiki installation.");
+        exit 1;
     }
     unless(chdir("$dir/bin")) {
-       print "Could not change into $dir/bin.\n";
-       return;
+        $log->error("Directory $dir/bin does not exist.");
+        exit 1;
     }
+
+    # read command line parameters
+    my %cfg =(
+        'port' => DEFAULTPORT,
+        'server' => DEFAULTADDRESS,
+    );
+    {
+        # redirect warning messages form GetOpt::Long to log file.
+        local $SIG{__WARN__} = sub { $log->error("Error in command line arguments: " . $_[0]); exit 1;};
+        GetOptions(
+            "port=i"   => \$cfg{'port'},
+            "server=s" => \$cfg{'server'},
+            "d"        => \$cfg{'daemon'},
+        );
+    }
+
+    # fork if daemon mode
+    if ( defined $cfg{'daemon'} ) {
+        my $cPID = fork;
+        if($cPID) {
+            print $cPID; # write PID to STDOUT, for initscript to catch 
+        }
+        if ( !defined $cPID ) { $log->error( "Can't fork: $!"); exit 1;};
+        if( $cPID ) { exit 0; };
+    }
+
+
     my $quitMatt = AnyEvent->condvar;
     my %clients;
     my %queues;
     my %waiting_workers;
     my %waiting2dep;
 
-    tcp_server('127.0.0.1', $daemonport, sub {
+    tcp_server($cfg{'server'}, $cfg{'port'}, sub {
             my ($fh, $host, $port) = @_;
-            my $cid = "$host:$port";
-            print "(MATTDaemon:$$:$daemonport) client connected from $cid\n";
+            my $cid = "$host:$port"; # get info for connected client
+            $log->info("$$:$cfg{'port'}: client connected from $cid\n");
             my $buffer;
             my $disconnect = sub {
-                print "(MATTDaemon:$$:$daemonport) client at $cid disconnected\n";
+                $log->info("$$:$cfg{'port'} client at $cid disconnected\n");
                 delete $clients{$cid};
                 return unless exists $waiting2dep{$cid};
                 delete $waiting_workers{$waiting2dep{$cid}}{$cid};
@@ -92,7 +139,7 @@ sub run {
                             }
                         } else {
                             my $department = $json->{department};
-                            print "$department - $json->{type}: $json->{data}\n" if DEBUG;
+                            $log->debug("$department - $json->{type}: $json->{data}\n");
                             my $wait = $json->{_wait};
                             $json->{_wait} = $cid if $wait;
                             if (keys %{$waiting_workers{$department}}) {

@@ -1,5 +1,4 @@
 #!/usr/bin/perl -w
-#
 # Copyright (C) 2014 Modell Aachen GmbH
 #
 # For licensing info read LICENSE file in the Foswiki root.
@@ -22,20 +21,36 @@ use AnyEvent::Handle;
 use AnyEvent::Socket;
 use IO::Socket       ();
 use JSON;
+use Getopt::Long;
+use Log::Dispatch;
+
+use constant DEFAULTPORT => 8090;
+use constant DEFAULTADDRESS => '127.0.0.1';
+
+# log dispatcher
+our $log;
 
 # Set library paths in @INC, at compile time
 BEGIN {
+    $log = Log::Dispatch->new(
+        outputs => [
+            [ 'Syslog', min_level => 'info', ident => 'MATTWorker'],
+        ],
+    );
+
     # check FOSWIKI_ROOT settings, change to /bin if possible
     my $dir = $ENV{FOSWIKI_ROOT};
     unless($dir) {
-        print "Please set FOSWIKI_ROOT to your Foswiki installation.\n";
+        $log->error("Please set FOSWIKI_ROOT to your Foswiki installation.");
         exit 1;
     }
     unless(chdir("$dir/bin")) {
-        print "Could not change into $dir/bin\n";
+        $log->error("Directory $dir/bin does not exist.");
         exit 1;
     }
+    
 
+    # foswiki stuff
     if (-e './setlib.cfg') {
         unshift @INC, '.';
     } elsif (-e '../bin/setlib.cfg') {
@@ -46,25 +61,52 @@ BEGIN {
     require 'setlib.cfg';
 }
 
-
+# We need Foswiki for VirtualHostingContrib stuff.
 use Foswiki ();
 use Foswiki::UI ();
-launchWorker();
 
 our %mattworker_data;
+
 
 sub _idle {
     my ($hdl, $handlers) = @_;
     $hdl->push_write(json => {department => $mattworker_data{department}, type => 'worker_idle', cache_fields => ($handlers->{cache_fields} || []) });
 }
 
-sub launchWorker {
+sub run {
+    # read command line parameters
+    my %cfg;
+    {
+        # redirect warning messages form GetOpt::Long to log file.
+        local $SIG{__WARN__} = sub { $log->error("Error in command line arguments: " . $_[0]); exit 1;};
+        GetOptions(
+            "department=s" => \$cfg{'department'},
+            "virtualhosts" => \$cfg{'virtualhosts'},
+            "d"            => \$cfg{'daemon'},
+        );
+    }
+    unless (defined $cfg{'department'} )
+    {
+        $log->error("Mandatory argument '--department' ist missing.");
+        exit 1;
+    }
+    # fork if daemon mode
+    if (defined $cfg{'daemon'} ) {
+        my $cPID = fork;
+        if($cPID) {
+            print $cPID; # write PID to STDOUT, for initscript to catch 
+        }
+        if ( !defined $cPID ) { $log->error( "Can't fork: $!"); exit 1;};
+        if( $cPID ) { exit 0; };
+    }
+
+
     my $exitWorker = AnyEvent->condvar;
     AE::signal INT => sub { $exitWorker->send; };
 
-    my $department = $ENV{MW_DEPARTMENT};
-    my $handlers = require "Foswiki/Plugins/${department}/Grinder.pm";
-    $mattworker_data{department} = $department;
+    my $handlers = require "Foswiki/Plugins/$cfg{'department'}/Grinder.pm";
+    #my $handlers = require "Foswiki/Plugins/SolrPlugin/Grinder.pm";
+    $mattworker_data{department} = $cfg{'department'};
     $mattworker_data{handlers} = $handlers;
 
     my @read; @read = (json => sub {
@@ -77,7 +119,7 @@ sub launchWorker {
         $mattworker_data{data} = $json->{data};
 
         my $run_engine;
-        if ($ENV{VIRTUALHOSTS}) {
+        if ( defined $cfg{'virtualhosts'} ) {
             $run_engine = sub {
                 require Foswiki::Contrib::VirtualHostingContrib::VirtualHost;
                 Foswiki::Contrib::VirtualHostingContrib::VirtualHost->run_on($host, sub { $Foswiki::engine->run(); } );
@@ -116,28 +158,30 @@ sub launchWorker {
         $hdl->push_read(@read);
     });
     my $hdl = new AnyEvent::Handle(
-        connect => ['127.0.0.1', $Foswiki::cfg{TaskDaemonPlugin}{port} || 8090],
+        connect => [$Foswiki::cfg{TaskDaemonPlugin}{Address} || DEFAULTADDRESS, $Foswiki::cfg{TaskDaemonPlugin}{Port} || DEFAULTPORT],
         on_connect => sub {
             my $hdl = shift;
             _idle($hdl, $handlers);
             $hdl->push_read(@read);
         },
         on_connect_error => sub {
-            print "Worker: failed to connect to MATT daemon: $!\n";
-            exit();
+            $log->warn("Worker: failed to connect to MATTdaemon: $!");
+            exit(1);
         },
         on_eof => sub {
-            print "Worker: MATT daemon closed the connection, exiting.\n";
-            exit();
+            $log->info("Worker: MATT daemon closed the connection, exiting.");
+            exit(1);
         },
         on_error => sub {
             my ($hdl, $fatal, $message) = @_;
-            print "Worker: error in connection to MATT daemon: $message\n";
-            exit();
+            $log->warn("Worker: error in connection to MATT daemon: $message");
+            exit(1);
         },
     );
     $exitWorker->recv;
     $hdl->destroy;
 }
-1;
 
+run();
+
+1;

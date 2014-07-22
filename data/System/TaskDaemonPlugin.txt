@@ -1,33 +1,30 @@
 %META:TOPICPARENT{name="Plugins"}%
 <!--
 One line description, required for extensions repository catalog.
-   * Set SHORTDESCRIPTION = Simple example on how to get around IWatch.
+   * Set SHORTDESCRIPTION = Daemon allowing for task delegation.
 -->
----+!! TaskDaemon Plugin
+---+!! TaskDaemonPlugin
 
 %SHORTDESCRIPTION%
 
-Learn how to create your own plugin in %SYSTEMWEB%.DevelopingPlugins.
+The TaskDaemonPlugin allows delegation of certains tasks to worker processes.
 
 ---++ Preferences
----+++ Port for daemon
-By default the daemon runs on port 8090. If you need to change that port you must
-   1. set the daemon in configure (expert option for TaskDaemonPlugin)
-   1. tell the daemon to use that port; this can be done via a command line parameter
-       <verbatim>mattdaemon port=12345</verbatim>
+---+++ Port and address configuration
+By default the daemon runs on port 8090 and connects to 127.0.0.1. To change these settings:
+   1. Configure the daemon in configure (expert options for the TaskDaemonPlugin).
+   1. Configure the daemon to use a non-default port and address; This can be done using the daemons command lines parameters or changing the init script.
 
 ---++ Installation
 %$INSTALL_INSTRUCTIONS%
 
 ---++ Info
 
-|  Author: | MAOst |
-|  Copyright: | &copy; 2011, Foswiki Contributors |
+|  Author: | Modell Aachen GmbH |
+|  Copyright: | &copy; 2014, Modell Aachen GmbH |
 |  License: | GPL ([[http://www.gnu.org/copyleft/gpl.html][GNU General Public License]]) |
 |  Release: | %$RELEASE% |
 |  Version: | %$VERSION% |
 |  Change&nbsp;History: | <!-- versions below in reverse order -->&nbsp; |
-|  1.0.0 (XX Mmm 20XX): | Initial version |
-|  Home: | http://foswiki.org/Extensions/%TOPIC% |
-|  Support: | http://foswiki.org/Support/%TOPIC% |
+|  1.0.0 (22 Jul 2014): | Initial version |
 
