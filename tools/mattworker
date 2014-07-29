@@ -37,6 +37,7 @@ BEGIN {
             [ 'Syslog', min_level => 'info', ident => 'MATTWorker'],
         ],
     );
+    $log->info("Worker: started.");
 
     # check FOSWIKI_ROOT settings, change to /bin if possible
     my $dir = $ENV{FOSWIKI_ROOT};
@@ -48,7 +49,7 @@ BEGIN {
         $log->error("Directory $dir/bin does not exist.");
         exit 1;
     }
-    
+
 
     # foswiki stuff
     if (-e './setlib.cfg') {
@@ -87,7 +88,7 @@ sub run {
     }
     unless (defined $cfg{'department'} )
     {
-        $log->error("Mandatory argument '--department' ist missing.");
+        $log->error($cfg{'department'}.": Mandatory argument '--department' ist missing.");
         exit 1;
     }
     # fork if daemon mode
@@ -96,7 +97,7 @@ sub run {
         if($cPID) {
             print $cPID; # write PID to STDOUT, for initscript to catch 
         }
-        if ( !defined $cPID ) { $log->error( "Can't fork: $!"); exit 1;};
+        if ( !defined $cPID ) { $log->error( $cfg{'department'}.": Can't fork: $!"); exit 1;};
         if( $cPID ) { exit 0; };
     }
 
@@ -160,24 +161,26 @@ sub run {
     my $hdl = new AnyEvent::Handle(
         connect => [$Foswiki::cfg{TaskDaemonPlugin}{Address} || DEFAULTADDRESS, $Foswiki::cfg{TaskDaemonPlugin}{Port} || DEFAULTPORT],
         on_connect => sub {
+            $log->info($cfg{'department'} . ": Connecting to MATTDaemon.");
             my $hdl = shift;
             _idle($hdl, $handlers);
             $hdl->push_read(@read);
         },
         on_connect_error => sub {
-            $log->warn("Worker: failed to connect to MATTdaemon: $!");
+            $log->warn($cfg{'department'} . ": failed to connect to MATTdaemon: $!");
             exit(1);
         },
         on_eof => sub {
-            $log->info("Worker: MATT daemon closed the connection, exiting.");
+            $log->info($cfg{'department'} . ": MATTdaemon closed the connection, exiting.");
             exit(1);
         },
         on_error => sub {
             my ($hdl, $fatal, $message) = @_;
-            $log->warn("Worker: error in connection to MATT daemon: $message");
+            $log->warn($cfg{'department'} . ": error in connection to MATTdaemon: $message");
             exit(1);
         },
     );
+    $log->info($cfg{'department'} . ": Stopping.");
     $exitWorker->recv;
     $hdl->destroy;
 }

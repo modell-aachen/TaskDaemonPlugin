@@ -4,4 +4,4 @@ lib/Foswiki/Plugins/TaskDaemonPlugin/Config.spec 0444 Configuration
 lib/Foswiki/Plugins/TaskDaemonPlugin/Grinder.pm 0444 Task grinder
 tools/mattdaemon 0555
 tools/mattworker 0555
-ressources/mattdaemon 0555
+ressources/mattdaemon 0755
