@@ -43,11 +43,11 @@ sub run {
     # check FOSWIKI_ROOT settings, change to /bin if possible
     my $dir = $ENV{FOSWIKI_ROOT};
     unless($dir) {
-        $log->error("Please set FOSWIKI_ROOT to your Foswiki installation.");
+        $log->log(level => 'error', message => "Please set FOSWIKI_ROOT to your Foswiki installation.");
         exit 1;
     }
     unless(chdir("$dir/bin")) {
-        $log->error("Directory $dir/bin does not exist.");
+        $log->log(level => 'error', message => "Directory $dir/bin does not exist.");
         exit 1;
     }
 
@@ -58,7 +58,7 @@ sub run {
     );
     {
         # redirect warning messages form GetOpt::Long to log file.
-        local $SIG{__WARN__} = sub { $log->error("Error in command line arguments: " . $_[0]); exit 1;};
+        local $SIG{__WARN__} = sub { $log->log(level => 'error', message => "Error in command line arguments: " . $_[0]); exit 1;};
         GetOptions(
             "port=i"   => \$cfg{'port'},
             "server=s" => \$cfg{'server'},
@@ -72,7 +72,7 @@ sub run {
         if($cPID) {
             print $cPID; # write PID to STDOUT, for initscript to catch 
         }
-        if ( !defined $cPID ) { $log->error( "Can't fork: $!"); exit 1;};
+        if ( !defined $cPID ) { $log->log(level => 'error', message =>  "Can't fork: $!"); exit 1;};
         if( $cPID ) { exit 0; };
     }
 
@@ -86,10 +86,10 @@ sub run {
     tcp_server($cfg{'server'}, $cfg{'port'}, sub {
             my ($fh, $host, $port) = @_;
             my $cid = "$host:$port"; # get info for connected client
-            $log->info("$$:$cfg{'port'}: client connected from $cid\n");
+            $log->log(level => 'info', message => "$$:$cfg{'port'}: client connected from $cid\n");
             my $buffer;
             my $disconnect = sub {
-                $log->info("$$:$cfg{'port'} client at $cid disconnected\n");
+                $log->log(level => 'info', message => "$$:$cfg{'port'} client at $cid disconnected\n");
                 delete $clients{$cid};
                 return unless exists $waiting2dep{$cid};
                 delete $waiting_workers{$waiting2dep{$cid}}{$cid};
@@ -139,7 +139,7 @@ sub run {
                             }
                         } else {
                             my $department = $json->{department};
-                            $log->debug("$department - $json->{type}: $json->{data}\n");
+                            $log->log(level => 'debug', message => "$department - $json->{type}: $json->{data}\n");
                             my $wait = $json->{_wait};
                             $json->{_wait} = $cid if $wait;
                             if (keys %{$waiting_workers{$department}}) {

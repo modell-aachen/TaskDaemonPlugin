@@ -37,16 +37,16 @@ BEGIN {
             [ 'Syslog', min_level => 'info', ident => 'MATTWorker'],
         ],
     );
-    $log->info("Worker: started.");
+    $log->log(level => 'info', message => "Worker: started.");
 
     # check FOSWIKI_ROOT settings, change to /bin if possible
     my $dir = $ENV{FOSWIKI_ROOT};
     unless($dir) {
-        $log->error("Please set FOSWIKI_ROOT to your Foswiki installation.");
+        $log->log(level => 'error', message => "Please set FOSWIKI_ROOT to your Foswiki installation.");
         exit 1;
     }
     unless(chdir("$dir/bin")) {
-        $log->error("Directory $dir/bin does not exist.");
+        $log->log(level => 'error', message => "Directory $dir/bin does not exist.");
         exit 1;
     }
 
@@ -79,7 +79,7 @@ sub run {
     my %cfg;
     {
         # redirect warning messages form GetOpt::Long to log file.
-        local $SIG{__WARN__} = sub { $log->error("Error in command line arguments: " . $_[0]); exit 1;};
+        local $SIG{__WARN__} = sub { $log->log(level => 'error', message => "Error in command line arguments: " . $_[0]); exit 1;};
         GetOptions(
             "department=s" => \$cfg{'department'},
             "virtualhosts" => \$cfg{'virtualhosts'},
@@ -88,7 +88,7 @@ sub run {
     }
     unless (defined $cfg{'department'} )
     {
-        $log->error($cfg{'department'}.": Mandatory argument '--department' ist missing.");
+        $log->log(level => 'error', message => $cfg{'department'}.": Mandatory argument '--department' ist missing.");
         exit 1;
     }
     # fork if daemon mode
@@ -97,7 +97,7 @@ sub run {
         if($cPID) {
             print $cPID; # write PID to STDOUT, for initscript to catch 
         }
-        if ( !defined $cPID ) { $log->error( $cfg{'department'}.": Can't fork: $!"); exit 1;};
+        if ( !defined $cPID ) { $log->log(level => 'error', message =>  $cfg{'department'}.": Can't fork: $!"); exit 1;};
         if( $cPID ) { exit 0; };
     }
 
@@ -161,26 +161,26 @@ sub run {
     my $hdl = new AnyEvent::Handle(
         connect => [$Foswiki::cfg{TaskDaemonPlugin}{Address} || DEFAULTADDRESS, $Foswiki::cfg{TaskDaemonPlugin}{Port} || DEFAULTPORT],
         on_connect => sub {
-            $log->info($cfg{'department'} . ": Connecting to MATTDaemon.");
+            $log->log(level => 'info', message => $cfg{'department'} . ": Connecting to MATTDaemon.");
             my $hdl = shift;
             _idle($hdl, $handlers);
             $hdl->push_read(@read);
         },
         on_connect_error => sub {
-            $log->warn($cfg{'department'} . ": failed to connect to MATTdaemon: $!");
+            $log->log(level => 'warning', message => $cfg{'department'} . ": failed to connect to MATTdaemon: $!");
             exit(1);
         },
         on_eof => sub {
-            $log->info($cfg{'department'} . ": MATTdaemon closed the connection, exiting.");
+            $log->log(level => 'info', message => $cfg{'department'} . ": MATTdaemon closed the connection, exiting.");
             exit(1);
         },
         on_error => sub {
             my ($hdl, $fatal, $message) = @_;
-            $log->warn($cfg{'department'} . ": error in connection to MATTdaemon: $message");
+            $log->log(level => 'warning', message => $cfg{'department'} . ": error in connection to MATTdaemon: $message");
             exit(1);
         },
     );
-    $log->info($cfg{'department'} . ": Stopping.");
+    $log->log(level => 'info', message => $cfg{'department'} . ": Stopping.");
     $exitWorker->recv;
     $hdl->destroy;
 }
