@@ -133,10 +133,14 @@ sub run {
                             return if !exists $clients{$json->{cid}};
                             $clients{$json->{cid}}->push_write(json => {data => $json->{data}});
                         } elsif ($type eq 'harakiri') {
-                            foreach (keys %waiting_workers) {
-                                $waiting_workers{$_}{hdl}->push_write(json => {type => 'exit_worker'});
-                                $disconnect->($_);
+                            foreach my $eachDepartment (keys %waiting_workers) {
+                                foreach (keys %{$waiting_workers{$eachDepartment}}) {
+                                    $waiting_workers{$eachDepartment}{$_}{hdl}->push_write(json => {type => 'exit_worker'});
+                                    $cid = $_;
+                                    $disconnect->();
+                                }
                             }
+                            $quitMatt->send;
                         } else {
                             my $department = $json->{department};
                             $log->log(level => 'debug', message => "$department - $json->{type}: $json->{data}\n");
