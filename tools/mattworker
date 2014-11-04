@@ -83,7 +83,7 @@ sub run {
         GetOptions(
             "department=s" => \$cfg{'department'},
             "virtualhosts" => \$cfg{'virtualhosts'},
-            "d"            => \$cfg{'daemon'},
+            "d=s"          => \$cfg{'daemon'},
         );
     }
     unless (defined $cfg{'department'} )
@@ -91,14 +91,23 @@ sub run {
         $log->log(level => 'error', message => $cfg{'department'}.": Mandatory argument '--department' ist missing.");
         exit 1;
     }
+
     # fork if daemon mode
-    if (defined $cfg{'daemon'} ) {
+    if ( defined $cfg{'daemon'} ) {
         my $cPID = fork;
-        if($cPID) {
-            print $cPID; # write PID to STDOUT, for initscript to catch 
+        unless ( defined $cPID ) { $log->log( level => 'error', message =>  $cfg{'department'} . ": Can't fork: $!" ); exit 1;};
+        if ( $cPID ) { # if parent process
+            $log->log( level => 'debug', message => $cfg{'department'} . ": Parent received pid \"$cPID\".");
+            my $ok = open( my $fh, ">", $cfg{'daemon'});
+            if ( $ok ) { # write PID to file, for initscript to catch
+                print $fh $cPID;
+                $log->log( level => 'debug', message => $cfg{'department'} . ": Wrote pid to file.");
+                close $fh;
+            } else {
+                $log->log( level => 'error', message => $cfg{'department'} . ": Can not write pid file " . $cfg{'daemon'} . ": $!" );
+            }
+            exit 0;
         }
-        if ( !defined $cPID ) { $log->log(level => 'error', message =>  $cfg{'department'}.": Can't fork: $!"); exit 1;};
-        if( $cPID ) { exit 0; };
     }
 
 

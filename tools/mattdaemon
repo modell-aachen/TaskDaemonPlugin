@@ -35,7 +35,7 @@ if ( DEBUG ) { $loglevel = "debug"; }
 
 my $log = Log::Dispatch->new(
     outputs => [
-        [ 'Syslog', min_level => $loglevel, ident => 'MATTDaemon'],
+        [ 'Syslog', min_level => $loglevel, ident => 'MATTDaemon' ],
     ],
 );
 
@@ -62,18 +62,27 @@ sub run {
         GetOptions(
             "port=i"   => \$cfg{'port'},
             "server=s" => \$cfg{'server'},
-            "d"        => \$cfg{'daemon'},
+            "d=s"      => \$cfg{'daemon'},
         );
     }
 
     # fork if daemon mode
     if ( defined $cfg{'daemon'} ) {
+        $log->log( level => 'debug', message => "Run in daemon mode with pidfile \"" . $cfg{'daemon'} . "\".");
         my $cPID = fork;
-        if($cPID) {
-            print $cPID; # write PID to STDOUT, for initscript to catch 
+        unless ( defined $cPID ) { $log->log( level => 'error', message =>  "Can't fork: $!" ); exit 1;};
+        if ( $cPID ) { # if parent process
+            $log->log( level => 'debug', message => "Parent received pid \"$cPID\".");
+            my $ok = open( my $fh, ">", $cfg{'daemon'});
+            if ( $ok ) { # write PID to file, for initscript to catch
+                print $fh $cPID;
+                $log->log( level => 'debug', message => "Wrote pid to file.");
+                close $fh;
+            } else {
+                $log->log( level => 'error', message => "Can not write pid file " . $cfg{'daemon'} . ": $!" );
+            }
+            exit 0;
         }
-        if ( !defined $cPID ) { $log->log(level => 'error', message =>  "Can't fork: $!"); exit 1;};
-        if( $cPID ) { exit 0; };
     }
 
 
@@ -86,10 +95,10 @@ sub run {
     tcp_server($cfg{'server'}, $cfg{'port'}, sub {
             my ($fh, $host, $port) = @_;
             my $cid = "$host:$port"; # get info for connected client
-            $log->log(level => 'info', message => "$$:$cfg{'port'}: client connected from $cid\n");
+            $log->log(level => 'debug', message => "$$:$cfg{'port'}: client connected from $cid\n");
             my $buffer;
             my $disconnect = sub {
-                $log->log(level => 'info', message => "$$:$cfg{'port'} client at $cid disconnected\n");
+                $log->log(level => 'debug', message => "$$:$cfg{'port'} client at $cid disconnected\n");
                 delete $clients{$cid};
                 return unless exists $waiting2dep{$cid};
                 delete $waiting_workers{$waiting2dep{$cid}}{$cid};

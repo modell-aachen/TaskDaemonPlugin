@@ -11,8 +11,8 @@ set -eu
 ##############################################################################
 export FOSWIKI_ROOT="/var/www/qwikis/qwiki"
 BIN="./mattdaemon"
-PARAMS="-d"
 PIDFILE=/var/run/mattdaemon.pid
+PARAMS="-d $PIDFILE"
 WORKER_USER=www-data
 
 . /lib/lsb/init-functions
@@ -21,18 +21,20 @@ WORKER_USER=www-data
 
 case "${1:-}" in
     start)
-        if [ -f "$PIDFILE" ] ; then
-            log_warning_msg "Warning: mattdaemon already running, doing nothing (PIDFILE $PIDFILE exists)"
+        if [ -f "$PIDFILE" ]; then
+            log_warning_msg "Warning: mattdaemon already running - file $PIDFILE exists."
             exit 1
         fi
-
         log_daemon_msg "Starting mattdaemon" "mattdaemon"
+
         set +e
         cd $FOSWIKI_ROOT
         cd tools
 
-        su -c "cd $FOSWIKI_ROOT/tools; FOSWIKI_ROOT=$FOSWIKI_ROOT $BIN $PARAMS" $WORKER_USER > $PIDFILE
-        #start-stop-daemon -b --pidfile $PIDFILE --user $WORKER_USER -d $FOSWIKI_ROOT/tools --start --exec /usr/bin/perl --startas $BIN -- $PARAMS
+        # start daemon
+        touch $PIDFILE
+        chown $WORKER_USER $PIDFILE
+        su -c "cd $FOSWIKI_ROOT/tools; FOSWIKI_ROOT=$FOSWIKI_ROOT $BIN $PARAMS" $WORKER_USER
         RC=$?
         set -e
         log_end_msg $RC
