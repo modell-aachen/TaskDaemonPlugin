@@ -1,0 +1,3 @@
+#!/bin/sh
+# Helper script to start mattdaemon via systemd and still honoring $FOSWIKI_ROOT
+$FOSWIKI_ROOT/tools/mattdaemon $MATTD_PARAMS
