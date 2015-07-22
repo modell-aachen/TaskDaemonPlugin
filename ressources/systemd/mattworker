@@ -1,0 +1,2 @@
+#!/bin/sh
+$FOSWIKI_ROOT/tools/mattworker $MATTW_PARAMS
