@@ -5,3 +5,7 @@ lib/Foswiki/Plugins/TaskDaemonPlugin/Grinder.pm 0444 Task grinder
 tools/mattdaemon 0555
 tools/mattworker 0555
 ressources/mattdaemon 0755
+ressources/systemd/config/mattdaemon 0644
+ressources/systemd/mattdaemon 0755
+ressources/systemd/mattdaemon.service 0644
+ressources/systemd/mattworker 0755
