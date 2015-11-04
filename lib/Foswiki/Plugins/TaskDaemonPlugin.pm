@@ -59,7 +59,7 @@ sub send {
         Foswiki::Func::writeWarning("Sending '$type': '$message' to TaskDaemon") if DEBUG;
         my $host = $Foswiki::cfg{DefaultUrlHost};
         $host =~ s#^https?://##;
-        $socket->send(encode_json({
+        $socket->send(to_json({
             type => $type,
             data => $message,
             host => $host,
@@ -69,7 +69,7 @@ sub send {
         if($wait) {
             my $response;
             $socket->recv($response, 1234);
-            return decode_json($response);
+            return from_json($response);
         }
     } else { Foswiki::Func::writeWarning( "Can not bind to TaskDaemon: $@" )};
 }
