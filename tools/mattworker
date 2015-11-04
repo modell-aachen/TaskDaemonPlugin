@@ -188,6 +188,7 @@ sub run {
             $log->log(level => 'warning', message => $cfg{'department'} . ": error in connection to MATTdaemon: $message");
             exit(1);
         },
+        json => JSON->new,
     );
     $log->log(level => 'info', message => $cfg{'department'} . ": Stopping.");
     $exitWorker->recv;
