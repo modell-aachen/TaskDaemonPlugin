@@ -2,10 +2,10 @@ data/System/TaskDaemonPlugin.txt 0644 Documentation page
 lib/Foswiki/Plugins/TaskDaemonPlugin.pm 0444 Perl module
 lib/Foswiki/Plugins/TaskDaemonPlugin/Config.spec 0444 Configuration
 lib/Foswiki/Plugins/TaskDaemonPlugin/Grinder.pm 0444 Task grinder
-resources/TaskDaemonPlugin/mattdaemon 0755
-resources/TaskDaemonPlugin/systemd/config/mattdaemon 0644
-resources/TaskDaemonPlugin/systemd/mattdaemon 0755 systemd startup script
-resources/TaskDaemonPlugin/systemd/mattworker 0755 systemd startup script
-resources/TaskDaemonPlugin/systemd/mattdaemon.service 0644
+ressources/TaskDaemonPlugin/mattdaemon 0755
+ressources/TaskDaemonPlugin/systemd/config/mattdaemon 0644
+ressources/TaskDaemonPlugin/systemd/mattdaemon 0755 systemd startup script
+ressources/TaskDaemonPlugin/systemd/mattworker 0755 systemd startup script
+ressources/TaskDaemonPlugin/systemd/mattdaemon.service 0644
 tools/mattdaemon 0555
 tools/mattworker 0555
