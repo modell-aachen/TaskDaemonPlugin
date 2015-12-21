@@ -164,7 +164,7 @@ sub run {
                                 @{$json->{cache}}{@fields} = @{$hosts->{$host}}{@fields};
                                 $whdl->push_write(json => $json);
                             } else {
-                                $queues{$department} = () unless $queues{$department};
+                                $queues{$queueName} = [] unless $queues{$queueName};
                                 push @{$queues{$department}}, $json;
                             }
                             unless ($wait) {
