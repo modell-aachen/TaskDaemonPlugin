@@ -59,12 +59,15 @@ sub send {
         Foswiki::Func::writeWarning("Sending '$type': '$message' to TaskDaemon") if DEBUG;
         my $host = $Foswiki::cfg{DefaultUrlHost};
         $host =~ s#^https?://##;
+        my $core = $Foswiki::cfg{ScriptDir};
+        $core =~ s#/bin/?$##;
         $socket->send(encode_json({
             type => $type,
             data => $message,
             host => $host,
             department => $department,
             _wait => $wait || 0,
+            core => $core,
         }));
         if($wait) {
             my $response;
