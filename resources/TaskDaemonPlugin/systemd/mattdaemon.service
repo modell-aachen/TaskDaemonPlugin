@@ -1,11 +1,9 @@
 [Unit]
 Description=Modell Aachen Task and Topic Daemon
 After=network.target
-#Requires=docker.service
 
 [Service]
 EnvironmentFile=/etc/default/mattdaemon
-#User=${MATTD_USER}
 User=www-data
 ExecStart=/usr/local/bin/mattdaemon
 
