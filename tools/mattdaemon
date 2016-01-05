@@ -46,6 +46,7 @@ sub run {
         $log->log(level => 'error', message => "Please set FOSWIKI_ROOT to your Foswiki installation.");
         exit 1;
     }
+    $dir =~ s#/+$##;
     unless(chdir("$dir/bin")) {
         $log->log(level => 'error', message => "Directory $dir/bin does not exist.");
         exit 1;
@@ -118,8 +119,15 @@ sub run {
                             return;
                         }
                         if ($type eq 'worker_idle') {
-                            my $department = $json->{department} || '';
-                            my $queue = $queues{$department};
+                            my $department = $json->{department} || '';+
+                            my $core = $json->{core};
+                            unless ($core) {
+                                $log->log(level => 'error', message => "No core set, please update your workers ($department)\n");
+                                $hdl->push_write(json => {status => 'error', msg => 'No core set, worker is useless.'});
+                                return;
+                            }
+                            my $queueName = "$department\@$core";
+                            my $queue = $queues{$queueName};
                             if (ref $queue && @$queue) {
                                 my $wdata = shift @$queue;
                                 $wdata->{cache} = {};
@@ -127,8 +135,8 @@ sub run {
                                 @{$wdata->{cache}}{@fields} = @{$hosts->{$host}}{@fields};
                                 $hdl->push_write(json => $wdata);
                             } else {
-                                $waiting2dep{$cid} = $department;
-                                $waiting_workers{$department}{$cid} = {
+                                $waiting2dep{$cid} = $queueName;
+                                $waiting_workers{$queueName}{$cid} = {
                                     hdl => $hdl,
                                     cache_fields => $json->{cache_fields},
                                 };
@@ -152,20 +160,28 @@ sub run {
                             $quitMatt->send;
                         } else {
                             my $department = $json->{department};
-                            $log->log(level => 'debug', message => "$department - $json->{type}: $json->{data}\n");
+                            my $core = $json->{core};
+                            unless ($core) {
+                                $log->log(level => 'error', message => "No core set, please update your workers ($department)\n");
+                                $hdl->push_write(json => {status => 'error', msg => 'No core set, message discarded.'});
+                                return;
+                            }
+
+                            my $queueName = "$department\@$core";
+                            $log->log(level => 'debug', message => "$queueName - $json->{type}: $json->{data}\n");
                             my $wait = $json->{_wait};
                             $json->{_wait} = $cid if $wait;
-                            if (keys %{$waiting_workers{$department}}) {
-                                my ($worker) = keys %{$waiting_workers{$department}};
-                                $worker = delete $waiting_workers{$department}{$worker};
+                            if (keys %{$waiting_workers{$queueName}}) {
+                                my ($worker) = keys %{$waiting_workers{$queueName}};
+                                $worker = delete $waiting_workers{$queueName}{$worker};
                                 my $whdl = $worker->{hdl};
                                 $json->{cache} = {};
                                 my @fields = @{$worker->{cache_fields}};
                                 @{$json->{cache}}{@fields} = @{$hosts->{$host}}{@fields};
                                 $whdl->push_write(json => $json);
                             } else {
-                                $queues{$department} = () unless $queues{$department};
-                                push @{$queues{$department}}, $json;
+                                $queues{$queueName} = [] unless $queues{$queueName};
+                                push @{$queues{$queueName}}, $json;
                             }
                             unless ($wait) {
                                 $hdl->push_write(json => {status => 'ok', msg => 'queued'});

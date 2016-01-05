@@ -29,6 +29,8 @@ use constant DEFAULTADDRESS => '127.0.0.1';
 
 # log dispatcher
 our $log;
+our $dir = $ENV{FOSWIKI_ROOT};
+$dir =~ s#/+$##;
 
 # Set library paths in @INC, at compile time
 BEGIN {
@@ -71,7 +73,14 @@ our %mattworker_data;
 
 sub _idle {
     my ($hdl, $handlers) = @_;
-    $hdl->push_write(json => {department => $mattworker_data{department}, type => 'worker_idle', cache_fields => ($handlers->{cache_fields} || []) });
+    $hdl->push_write(
+        json => {
+            department => $mattworker_data{department},
+            type => 'worker_idle',
+            cache_fields => ($handlers->{cache_fields} || []),
+            core => $dir,
+        }
+    );
 }
 
 sub run {
@@ -151,6 +160,7 @@ sub run {
                         type => 'set_cache',
                         host => $host,
                         data => {key => $k, value => $v},
+                        core => $dir,
                     });
                 }
             }
@@ -160,6 +170,7 @@ sub run {
                     type => 'msg_to_client',
                     cid => $json->{_wait},
                     data => $response,
+                    core => $dir,
                 });
             }
         }
