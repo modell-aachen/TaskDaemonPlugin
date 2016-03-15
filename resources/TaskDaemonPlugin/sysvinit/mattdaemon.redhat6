@@ -48,7 +48,8 @@ case "${1:-}" in
         if [ -f "$PIDFILE" ] ; then
             log_daemon_msg "Stopping mattdaemon" "mattdaemon"
             set +e
-            /sbin/start-stop-daemon -K -p $PIDFILE
+            #/sbin/start-stop-daemon -K -p $PIDFILE
+            killproc -p $PIDFILE $BIN -INT
             RC=$?
             rm -f $PIDFILE
             set -e
