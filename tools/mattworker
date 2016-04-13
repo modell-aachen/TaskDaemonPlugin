@@ -91,6 +91,7 @@ sub run {
         local $SIG{__WARN__} = sub { $log->log(level => 'error', message => "Error in command line arguments: " . $_[0]); exit 1;};
         GetOptions(
             "department=s" => \$cfg{'department'},
+            "grinder=s"    => \$cfg{'grinder'},
             "virtualhosts" => \$cfg{'virtualhosts'},
             "d=s"          => \$cfg{'daemon'},
         );
@@ -123,8 +124,12 @@ sub run {
     my $exitWorker = AnyEvent->condvar;
     AE::signal INT => sub { $exitWorker->send; };
 
-    my $handlers = require "Foswiki/Plugins/$cfg{'department'}/Grinder.pm";
-    #my $handlers = require "Foswiki/Plugins/SolrPlugin/Grinder.pm";
+    my $handlers;
+    if ($cfg{grinder}) {
+        $handlers = require $cfg{grinder};
+    } else {
+        $handlers = require "Foswiki/Plugins/$cfg{'department'}/Grinder.pm";
+    }
     $mattworker_data{department} = $cfg{'department'};
     $mattworker_data{handlers} = $handlers;
 
@@ -138,7 +143,9 @@ sub run {
         $mattworker_data{data} = $json->{data};
 
         my $run_engine;
-        if ( defined $cfg{'virtualhosts'} ) {
+        if ( $cfg{'grinder'} ) {
+            # run_engine unavailable
+        } elsif ( defined $cfg{'virtualhosts'} ) {
             $run_engine = sub {
                 require Foswiki::Contrib::VirtualHostingContrib::VirtualHost;
                 Foswiki::Contrib::VirtualHostingContrib::VirtualHost->run_on($host, sub { $Foswiki::engine->run(); } );
