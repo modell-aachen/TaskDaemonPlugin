@@ -23,6 +23,9 @@ our $NO_PREFS_IN_TOPIC = 1;
 
 use constant DEBUG => 0;
 
+use constant RETURN_RESPONSE => 1;
+use constant RETURN_SOCKET => 2;
+
 sub initPlugin {
     my ( $topic, $web, $user, $installWeb ) = @_;
 
@@ -69,7 +72,8 @@ sub send {
             _wait => $wait || 0,
             core => $core,
         }));
-        if($wait) {
+        if ($wait) {
+            return $socket if $wait eq RETURN_SOCKET;
             my $response;
             $socket->recv($response, 1234);
             return decode_json($response);
