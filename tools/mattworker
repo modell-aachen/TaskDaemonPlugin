@@ -123,7 +123,13 @@ sub run {
     my $exitWorker = AnyEvent->condvar;
     AE::signal INT => sub { $exitWorker->send; };
 
-    my $handlers = require "Foswiki/Plugins/$cfg{'department'}/Grinder.pm";
+    my $handlers;
+    eval {
+       $handlers = require "Foswiki/Plugins/$cfg{'department'}/Grinder.pm";
+    };
+    unless ($handlers) {
+        $handlers = require "Foswiki/Contrib/$cfg{'department'}/Grinder.pm";
+    }
     #my $handlers = require "Foswiki/Plugins/SolrPlugin/Grinder.pm";
     $mattworker_data{department} = $cfg{'department'};
     $mattworker_data{handlers} = $handlers;
