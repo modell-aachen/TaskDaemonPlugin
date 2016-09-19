@@ -119,7 +119,7 @@ sub run {
                             return;
                         }
                         if ($type eq 'worker_idle') {
-                            my $department = $json->{department} || '';+
+                            my $department = $json->{department} || '';
                             my $core = $json->{core};
                             unless ($core) {
                                 $log->log(level => 'error', message => "No core set, please update your workers ($department)\n");
