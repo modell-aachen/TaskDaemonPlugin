@@ -127,9 +127,9 @@ sub run {
         while (my ($k, $v) = each(%queues)) {
             $filtered_queues->{$k} = [];
             for my $val (@$v) {
-                my $newval = { %$val };
+                my $newval = { %{$val->{data}} };
                 delete $newval->{_wait};
-                push @{$filtered_queues->{$k}}, $newval;
+                push @{$filtered_queues->{$k}}, {%$val, data => $newval};
             }
         }
         print $fh encode_json($filtered_queues);
@@ -173,6 +173,7 @@ sub run {
                             if (ref $queue && @$queue) {
                                 my $wdata = shift @$queue;
                                 $write_queuefile->();
+                                $wdata = $wdata->{data};
                                 $wdata->{cache} = {};
                                 my @fields = @{$json->{cache_fields}};
                                 @{$wdata->{cache}}{@fields} = @{$hosts->{$host}}{@fields};
@@ -184,6 +185,23 @@ sub run {
                                     cache_fields => $json->{cache_fields},
                                 };
                             }
+                        } elsif ($type eq 'queue_status') {
+                            my $queueinfo = {};
+                            while (my ($qname, $q) = each(%queues)) {
+                                my @times = map { $_->{ts} } @$q;
+                                if (!@times) {
+                                    $queueinfo->{$qname} = {count => 0, min => 0, max => 0, avg => 0, med => 0};
+                                    next;
+                                }
+                                my $now = time;
+                                my $oldest = $now - $times[0];
+                                my $newest = $now - $times[-1];
+                                my $avg = 0; $avg += ($now - $_) for @times;
+                                $avg /= @times;
+                                my $median = $times[int(@times/2)];
+                                $queueinfo->{$qname} = {count => scalar @times, min => $newest, max => $oldest, avg => $avg, med => $median};
+                            }
+                            $hdl->push_write(json => {queue_status => $queueinfo});
                         } elsif ($type eq 'set_cache') {
                             $hosts->{$host} ||= {};
                             $hosts->{$host}{$json->{data}{key}} = $json->{data}{value};
@@ -235,7 +253,7 @@ sub run {
                                 $whdl->push_write(json => $json);
                             } else {
                                 $queues{$queueName} = [] unless $queues{$queueName};
-                                push @{$queues{$queueName}}, $json;
+                                push @{$queues{$queueName}}, {data => $json, ts => time};
                                 $write_queuefile->();
                             }
                             unless ($wait) {
