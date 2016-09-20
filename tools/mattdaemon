@@ -21,6 +21,7 @@ package MATTDaemon;
 use AnyEvent::Handle;
 use AnyEvent::Socket;
 use Getopt::Long;
+use JSON;
 use Log::Dispatch;
 
 use constant DEBUG => 0;
@@ -61,9 +62,10 @@ sub run {
         # redirect warning messages form GetOpt::Long to log file.
         local $SIG{__WARN__} = sub { $log->log(level => 'error', message => "Error in command line arguments: " . $_[0]); exit 1;};
         GetOptions(
-            "port=i"   => \$cfg{'port'},
-            "server=s" => \$cfg{'server'},
-            "d=s"      => \$cfg{'daemon'},
+            "port=i"        => \$cfg{'port'},
+            "server=s"      => \$cfg{'server'},
+            "q|queuefile=s" => \$cfg{'queuefile'},
+            "d"             => \$cfg{'daemon'},
         );
     }
 
@@ -86,12 +88,52 @@ sub run {
         }
     }
 
-
     my $quitMatt = AnyEvent->condvar;
     my %clients;
     my %queues;
     my %waiting_workers;
     my %waiting2dep;
+
+    if ($cfg{queuefile}) {
+        my $openres = open(my $fh, '<', $cfg{queuefile});
+        if ($openres) {
+            local $/;
+            my $queuedata;
+            eval {
+                $queuedata = decode_json(<$fh>);
+            };
+            if ($@) {
+                $log->log( level => 'warn', message => "Not using data from queue file '$cfg{queuefile}', invalid JSON: $@" );
+            } else {
+                %queues = %$queuedata;
+            }
+        } else {
+            $log->log( level => 'warn', message => "Not reading queue file '$cfg{queuefile}': $!" );
+        }
+    }
+
+    my $write_queuefile = sub {
+        return unless $cfg{queuefile};
+        open(my $fh, '>', $cfg{queuefile}) or do {
+            $log->log( level => 'warn', message => "Not writing queue file '$cfg{queuefile}': $!" );
+            return;
+        };
+        # we have to get rid of the _wait tags here so that future workers
+        # don't get confused by messages the daemon thinks it needs to send
+        # them, just because they happen to have the ID of a worker in a
+        # previous life.
+        # unfortunately this is quite tedious.
+        my $filtered_queues = {};
+        while (my ($k, $v) = each(%queues)) {
+            $filtered_queues->{$k} = [];
+            for my $val (@$v) {
+                my $newval = { %$val };
+                delete $newval->{_wait};
+                push @{$filtered_queues->{$k}}, $newval;
+            }
+        }
+        print $fh encode_json($filtered_queues);
+    };
 
     tcp_server($cfg{'server'}, $cfg{'port'}, sub {
             my ($fh, $host, $port) = @_;
@@ -130,6 +172,7 @@ sub run {
                             my $queue = $queues{$queueName};
                             if (ref $queue && @$queue) {
                                 my $wdata = shift @$queue;
+                                $write_queuefile->();
                                 $wdata->{cache} = {};
                                 my @fields = @{$json->{cache_fields}};
                                 @{$wdata->{cache}}{@fields} = @{$hosts->{$host}}{@fields};
@@ -182,6 +225,7 @@ sub run {
                             } else {
                                 $queues{$queueName} = [] unless $queues{$queueName};
                                 push @{$queues{$queueName}}, $json;
+                                $write_queuefile->();
                             }
                             unless ($wait) {
                                 $hdl->push_write(json => {status => 'ok', msg => 'queued'});
