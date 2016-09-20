@@ -1,0 +1,48 @@
+#!/usr/bin/perl
+
+use IO::Socket ();
+use JSON;
+
+my $host = $ENV{'MATTDAEMON_HOST'} || 'localhost';
+my $port = $ENV{'MATTDAEMON_PORT'} || '8090';
+
+my $data = {};
+
+while (my $arg = shift @ARGV) {
+	my ($k, $v) = split(/=/, $arg, 2);
+	$data->{$k} = $v;
+}
+
+if (!$data->{type} || !$data->{core}) {
+	die <<EOM
+Syntax (examples):
+./mattdaemon-query type=queue_status core=/var/www/qwikis/qwiki
+./mattdaemon-query type=clear_queue core=/var/www/qwikis/qwiki department=SolrPlugin
+EOM
+}
+
+if ( my $socket = new IO::Socket::INET->new(
+	PeerAddr => $host,
+	PeerPort => $port,
+	Proto => 'tcp',
+	Timeout => 10)
+) {
+	my $type = delete $data->{type};
+	my $department = delete $data->{department};
+	my $host = delete $data->{host};
+	$host =~ s#^https?://##;
+	my $core = delete $data->{core};
+	$core =~ s#/bin/?$##;
+	$socket->send(encode_json({
+		type => $type,
+		data => $data,
+		host => $host,
+		department => $department,
+		core => $core,
+	}));
+	my $response;
+	$socket->recv($response, 4096);
+	print $response;
+} else {
+	warn( "Can not bind to TaskDaemon: $!" );
+};
