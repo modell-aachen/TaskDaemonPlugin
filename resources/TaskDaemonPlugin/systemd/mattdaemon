@@ -1,3 +1,6 @@
 #!/bin/sh
 # Helper script to start mattdaemon via systemd and still honoring $FOSWIKI_ROOT
-$FOSWIKI_ROOT/tools/mattdaemon $MATTD_PARAMS
+
+QUEUEPATH="$FOSWIKI_ROOT/working/work_areas/TaskDaemonPlugin"
+mkdir -p "$QUEUEPATH"
+$FOSWIKI_ROOT/tools/mattdaemon --queuefile "$QUEUEPATH/mattdaemon.queue" $MATTD_PARAMS
