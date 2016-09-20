@@ -198,7 +198,7 @@ sub run {
                                 my $newest = $now - $times[-1];
                                 my $avg = 0; $avg += ($now - $_) for @times;
                                 $avg /= @times;
-                                my $median = $times[int(@times/2)];
+                                my $median = $now - $times[int(@times/2)];
                                 $queueinfo->{$qname} = {count => scalar @times, min => $newest, max => $oldest, avg => $avg, med => $median};
                             }
                             $hdl->push_write(json => {queue_status => $queueinfo});
