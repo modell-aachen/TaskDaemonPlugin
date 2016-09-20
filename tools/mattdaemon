@@ -199,7 +199,7 @@ sub run {
                                 my $avg = 0; $avg += ($now - $_) for @times;
                                 $avg /= @times;
                                 my $median = $now - $times[int(@times/2)];
-                                $queueinfo->{$qname} = {count => scalar @times, min => $newest, max => $oldest, avg => $avg, med => $median};
+                                $queueinfo->{$qname} = {count => scalar @times, min_age => $newest, max_age => $oldest, avg_age => $avg, med_age => $median};
                             }
                             $hdl->push_write(json => {queue_status => $queueinfo});
                         } elsif ($type eq 'set_cache') {
