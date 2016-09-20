@@ -192,6 +192,17 @@ sub run {
                         } elsif ($type eq 'msg_to_client') {
                             return if !exists $clients{$json->{cid}};
                             $clients{$json->{cid}}->push_write(json => {data => $json->{data}});
+                        } elsif ($type eq 'clear_queue') {
+                            my $department = $json->{department};
+                            my $core = $json->{core};
+                            unless ($core) {
+                                $log->log(level => 'error', message => "No core set, please update your workers ($department)\n");
+                                $hdl->push_write(json => {status => 'error', msg => 'No core set, message discarded.'});
+                                return;
+                            }
+                            my $queueName = "$department\@$core";
+                            $queues{$queueName} = [];
+                            $hdl->push_write(json => {status => 'ok', msg => 'cleared'});
                         } elsif ($type eq 'harakiri') {
                             foreach my $eachDepartment (keys %waiting_workers) {
                                 foreach (keys %{$waiting_workers{$eachDepartment}}) {
