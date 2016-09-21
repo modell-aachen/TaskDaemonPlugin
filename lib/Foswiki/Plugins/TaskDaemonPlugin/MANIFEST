@@ -9,4 +9,5 @@ resources/TaskDaemonPlugin/systemd/mattworker 0755 systemd startup script
 resources/TaskDaemonPlugin/systemd/mattdaemon.service 0644
 resources/TaskDaemonPlugin/sysvinit/mattdaemon.redhat6 0644
 tools/mattdaemon 0555
+tools/mattdaemon-query 0555
 tools/mattworker 0555
