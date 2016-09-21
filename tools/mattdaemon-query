@@ -45,4 +45,5 @@ if ( my $socket = new IO::Socket::INET->new(
 	print $response;
 } else {
 	warn( "Can not bind to TaskDaemon: $!" );
+	exit 1;
 };
