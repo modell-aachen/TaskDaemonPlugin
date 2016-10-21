@@ -21,6 +21,7 @@ package MATTDaemon;
 use AnyEvent::Handle;
 use AnyEvent::Socket;
 use Getopt::Long;
+use JSON;
 use Log::Dispatch;
 
 use constant DEBUG => 0;
@@ -61,9 +62,10 @@ sub run {
         # redirect warning messages form GetOpt::Long to log file.
         local $SIG{__WARN__} = sub { $log->log(level => 'error', message => "Error in command line arguments: " . $_[0]); exit 1;};
         GetOptions(
-            "port=i"   => \$cfg{'port'},
-            "server=s" => \$cfg{'server'},
-            "d=s"      => \$cfg{'daemon'},
+            "port=i"        => \$cfg{'port'},
+            "server=s"      => \$cfg{'server'},
+            "q|queuefile=s" => \$cfg{'queuefile'},
+            "d"             => \$cfg{'daemon'},
         );
     }
 
@@ -86,12 +88,52 @@ sub run {
         }
     }
 
-
     my $quitMatt = AnyEvent->condvar;
     my %clients;
     my %queues;
     my %waiting_workers;
     my %waiting2dep;
+
+    if ($cfg{queuefile}) {
+        my $openres = open(my $fh, '<', $cfg{queuefile});
+        if ($openres) {
+            local $/;
+            my $queuedata;
+            eval {
+                $queuedata = decode_json(<$fh>);
+            };
+            if ($@) {
+                $log->log( level => 'warn', message => "Not using data from queue file '$cfg{queuefile}', invalid JSON: $@" );
+            } else {
+                %queues = %$queuedata;
+            }
+        } else {
+            $log->log( level => 'warn', message => "Not reading queue file '$cfg{queuefile}': $!" );
+        }
+    }
+
+    my $write_queuefile = sub {
+        return unless $cfg{queuefile};
+        open(my $fh, '>', $cfg{queuefile}) or do {
+            $log->log( level => 'warn', message => "Not writing queue file '$cfg{queuefile}': $!" );
+            return;
+        };
+        # we have to get rid of the _wait tags here so that future workers
+        # don't get confused by messages the daemon thinks it needs to send
+        # them, just because they happen to have the ID of a worker in a
+        # previous life.
+        # unfortunately this is quite tedious.
+        my $filtered_queues = {};
+        while (my ($k, $v) = each(%queues)) {
+            $filtered_queues->{$k} = [];
+            for my $val (@$v) {
+                my $newval = { %{$val->{data}} };
+                delete $newval->{_wait};
+                push @{$filtered_queues->{$k}}, {%$val, data => $newval};
+            }
+        }
+        print $fh encode_json($filtered_queues);
+    };
 
     tcp_server($cfg{'server'}, $cfg{'port'}, sub {
             my ($fh, $host, $port) = @_;
@@ -119,7 +161,7 @@ sub run {
                             return;
                         }
                         if ($type eq 'worker_idle') {
-                            my $department = $json->{department} || '';+
+                            my $department = $json->{department} || '';
                             my $core = $json->{core};
                             unless ($core) {
                                 $log->log(level => 'error', message => "No core set, please update your workers ($department)\n");
@@ -130,6 +172,8 @@ sub run {
                             my $queue = $queues{$queueName};
                             if (ref $queue && @$queue) {
                                 my $wdata = shift @$queue;
+                                $write_queuefile->();
+                                $wdata = $wdata->{data};
                                 $wdata->{cache} = {};
                                 my @fields = @{$json->{cache_fields}};
                                 @{$wdata->{cache}}{@fields} = @{$hosts->{$host}}{@fields};
@@ -141,6 +185,23 @@ sub run {
                                     cache_fields => $json->{cache_fields},
                                 };
                             }
+                        } elsif ($type eq 'queue_status') {
+                            my $queueinfo = {};
+                            while (my ($qname, $q) = each(%queues)) {
+                                my @times = map { $_->{ts} } @$q;
+                                if (!@times) {
+                                    $queueinfo->{$qname} = {count => 0, min => 0, max => 0, avg => 0, med => 0};
+                                    next;
+                                }
+                                my $now = time;
+                                my $oldest = $now - $times[0];
+                                my $newest = $now - $times[-1];
+                                my $avg = 0; $avg += ($now - $_) for @times;
+                                $avg /= @times;
+                                my $median = $now - $times[int(@times/2)];
+                                $queueinfo->{$qname} = {count => scalar @times, min_age => $newest, max_age => $oldest, avg_age => $avg, med_age => $median};
+                            }
+                            $hdl->push_write(json => {queue_status => $queueinfo});
                         } elsif ($type eq 'set_cache') {
                             $hosts->{$host} ||= {};
                             $hosts->{$host}{$json->{data}{key}} = $json->{data}{value};
@@ -149,6 +210,17 @@ sub run {
                         } elsif ($type eq 'msg_to_client') {
                             return if !exists $clients{$json->{cid}};
                             $clients{$json->{cid}}->push_write(json => {data => $json->{data}});
+                        } elsif ($type eq 'clear_queue') {
+                            my $department = $json->{department};
+                            my $core = $json->{core};
+                            unless ($core) {
+                                $log->log(level => 'error', message => "No core set, please update your workers ($department)\n");
+                                $hdl->push_write(json => {status => 'error', msg => 'No core set, message discarded.'});
+                                return;
+                            }
+                            my $queueName = "$department\@$core";
+                            $queues{$queueName} = [];
+                            $hdl->push_write(json => {status => 'ok', msg => 'cleared'});
                         } elsif ($type eq 'harakiri') {
                             foreach my $eachDepartment (keys %waiting_workers) {
                                 foreach (keys %{$waiting_workers{$eachDepartment}}) {
@@ -181,7 +253,8 @@ sub run {
                                 $whdl->push_write(json => $json);
                             } else {
                                 $queues{$queueName} = [] unless $queues{$queueName};
-                                push @{$queues{$queueName}}, $json;
+                                push @{$queues{$queueName}}, {data => $json, ts => time};
+                                $write_queuefile->();
                             }
                             unless ($wait) {
                                 $hdl->push_write(json => {status => 'ok', msg => 'queued'});
