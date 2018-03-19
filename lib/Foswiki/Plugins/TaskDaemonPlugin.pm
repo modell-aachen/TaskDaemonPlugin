@@ -62,9 +62,9 @@ sub grind {
 
 # send message to TaskDaemon
 sub send {
-    my ($message, $type, $department, $wait) = @_;
+    my ($message, $type, $department, $wait, $isRetry) = @_;
 
-    unless ( defined $socket ) {
+    unless ( defined $socket && $socket->connected() ) {
         $socket = new IO::Socket::INET->new(
             PeerAddr => $Foswiki::cfg{TaskDaemonPlugin}{Address} || 127.0.0.1,
             PeerPort => $Foswiki::cfg{TaskDaemonPlugin}{Port} || 8090,
@@ -84,7 +84,7 @@ sub send {
         $host =~ s#^https?://##;
         my $core = $Foswiki::cfg{ScriptDir};
         $core =~ s#/bin/?$##;
-        $socket->send(encode_json({
+        my $sent = $socket->send(encode_json({
             type => $type,
             data => $message,
             host => $host,
@@ -92,6 +92,17 @@ sub send {
             _wait => $wait || 0,
             core => $core,
         }));
+        unless($sent && $socket->connected()) {
+            if($isRetry) {
+                Foswiki::Func::writeWarning("Failed to send command to daemon") if DEBUG;
+                return;
+            } else {
+                # Maybe the socket closed (which we apparently can not detect), so retry once.
+                # This happens, when the daemon restarts.
+                Foswiki::Func::writeWarning("Socket no longer valid, re-attempting") if DEBUG;
+                return Foswiki::Plugins::TaskDaemonPlugin::send($message, $type, $department, $wait, 1);
+            }
+        }
         if ($wait) {
             return $socket if $wait eq RETURN_SOCKET;
             my $response;
