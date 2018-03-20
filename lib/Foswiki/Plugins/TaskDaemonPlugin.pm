@@ -64,7 +64,7 @@ sub grind {
 sub send {
     my ($message, $type, $department, $wait, $isRetry) = @_;
 
-    unless ( defined $socket && $socket->connected() ) {
+    unless ( $socket && $socket->connected() ) {
         $socket = new IO::Socket::INET->new(
             PeerAddr => $Foswiki::cfg{TaskDaemonPlugin}{Address} || 127.0.0.1,
             PeerPort => $Foswiki::cfg{TaskDaemonPlugin}{Port} || 8090,
