@@ -27,11 +27,15 @@ use Encode qw(encode);
         my $json = from_json($data);
         if($json->{callback}){
             eval {
-                "$json->{callback}"->grinder($session, $type, $data, $caches);
+                if("$json->{callback}"->can('grinder')) {
+                    "$json->{callback}"->grinder($session, $type, $data, $caches);
+                } else {
+                    Foswiki::Func::writeWarning("Grinder called, but the callback-Plugin ($json->{callback}) has no grinder-method");
+                }
             };
             if($@) {
                 print STDERR $@;
-                Foswiki::Func::writeWarning("Grinder called, but the callback-Plugin has no grinder-method ($@)");
+                Foswiki::Func::writeWarning("Error while executing callback: $@");
             }
         } else {
             Foswiki::Func::writeWarning("Grinder called, but no callback was found");
