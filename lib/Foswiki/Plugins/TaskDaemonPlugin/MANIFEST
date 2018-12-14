@@ -4,6 +4,8 @@ lib/Foswiki/Plugins/TaskDaemonPlugin/Config.spec 0444 Configuration
 lib/Foswiki/Plugins/TaskDaemonPlugin/Grinder.pm 0444 Task grinder
 resources/TaskDaemonPlugin/mattdaemon 0755
 resources/TaskDaemonPlugin/systemd/config/mattdaemon 0644
+resources/TaskDaemonPlugin/systemd/config/taskdaemonworker 0644
+resources/TaskDaemonPlugin/systemd/taskdaemonworker@.service 0755 systemd startup script
 resources/TaskDaemonPlugin/systemd/mattdaemon 0755 systemd startup script
 resources/TaskDaemonPlugin/systemd/mattworker 0755 systemd startup script
 resources/TaskDaemonPlugin/systemd/mattdaemon.service 0644

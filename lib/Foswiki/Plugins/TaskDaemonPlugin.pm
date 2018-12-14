@@ -57,6 +57,8 @@ sub grind {
     my $data = $main::mattworker_data{data};
     my $caches = $main::mattworker_data{caches};
 
+    Foswiki::Func::getContext()->{MattDaemonIsGrinding} = 1;
+
     $main::mattworker_data{handlers}{engine_part}->($session, $type, $data, $caches);
 }
 
