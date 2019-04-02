@@ -1,7 +1,6 @@
 [Unit]
 Description=TaskDaemonPluginworker for MATTDaemon
 After=network.target mattdaemon.service
-Requires=mattdaemon.service
 
 [Service]
 EnvironmentFile=/etc/default/taskdaemonworker-%i
